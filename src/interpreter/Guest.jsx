@@ -34,12 +34,12 @@ export default function Guest() {
 
   useEffect(() => onAuthStateChanged(auth, (u) => {
     if (u) setReady(true);
-    else signInAnonymously(auth).catch(() => setErr('Tidak bisa terhubung. Periksa internet Anda lalu muat ulang halaman.'));
+    else signInAnonymously(auth).catch((e) => setErr('Tidak bisa terhubung (kode: ' + (e.code || 'tidak diketahui') + '). Periksa internet Anda lalu muat ulang halaman.'));
   }), []);
 
   useEffect(() => {
     if (!ready) return;
-    return onValue(ref(db, 'interpreter/config'), (s) => setCfg(s.val() || {}), () => {});
+    return onValue(ref(db, 'interpreter/config'), (s) => setCfg(s.val() || {}), (e) => setErr('Data acara tidak bisa dimuat (kode: ' + (e.code || 'tidak diketahui') + ').'));
   }, [ready]);
 
   const bantuan = Object.entries(cfg.bantuan || {}).map(([id, v]) => ({ id, ...v }));
@@ -69,8 +69,8 @@ export default function Guest() {
       const rec = { nama: d.nama, receiver: d.receiver };
       try { localStorage.setItem(KEY, JSON.stringify(rec)); } catch { /* abaikan */ }
       setDone(rec);
-    } catch {
-      setErr(`Receiver No. ${d.receiver} gagal dicatat. Kemungkinan nomor itu sedang tercatat dipinjam tamu lain, atau sinyal terputus. Cek kembali angka pada alat, atau hubungi Usher.`);
+    } catch (e2) {
+      setErr(`Receiver No. ${d.receiver} gagal dicatat (kode: ${e2.code || 'tidak diketahui'}). Kemungkinan nomor itu sedang tercatat dipinjam tamu lain, atau sinyal terputus. Cek kembali angka pada alat, atau hubungi Usher.`);
     }
     setBusy(false);
   };
