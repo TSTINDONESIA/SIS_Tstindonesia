@@ -1,0 +1,63 @@
+{
+  "rules": {
+    ".read": false,
+    ".write": false,
+    "interpreter": {
+      ".read": false,
+      ".write": false,
+      "usher": {
+        "$uid": {
+          ".read": "auth!=null&&auth.uid===$uid",
+          ".write": false
+        }
+      },
+      "config": {
+        ".read": "auth!=null",
+        ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true"
+      },
+      "pinjam": {
+        ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true",
+        "$id": {
+          ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true)||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.parent().parent().child('aktif').child(newData.child('receiver').val()).val()===$id)",
+          ".validate": "newData.hasChildren(['nama','hp','institusi','receiver','waktu','status'])",
+          "nama": {
+            ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=80"
+          },
+          "hp": {
+            ".validate": "newData.isString()&&newData.val().matches(/^[0-9+ -]{6,20}$/)"
+          },
+          "institusi": {
+            ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=100"
+          },
+          "receiver": {
+            ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,6}$/)"
+          },
+          "waktu": {
+            ".validate": "newData.val()===now"
+          },
+          "status": {
+            ".validate": "newData.val()==='dipinjam'||newData.val()==='kembali'"
+          },
+          "kembaliWaktu": {
+            ".validate": "newData.isNumber()"
+          },
+          "reminderTerakhir": {
+            ".validate": "newData.isNumber()"
+          },
+          "reminderJumlah": {
+            ".validate": "newData.isNumber()"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "aktif": {
+        "$rcv": {
+          ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true)||(auth!=null&&!data.exists())",
+          ".validate": "$rcv.matches(/^[A-Z0-9-]{1,6}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).exists()"
+        }
+      }
+    }
+  }
+}
