@@ -6,8 +6,5 @@ export default {
   storageBucket: 'sis-tstindo.firebasestorage.app',
   messagingSenderId: '178956358759',
   appId: '1:178956358759:web:5d3dc78ddeb2a2923a70c2',
-  // WAJIB jika Realtime Database dibuat di Singapore/Belgium. Salin dari
-  // Console -> Realtime Database (URL di atas data), lalu hapus tanda // di bawah:
-  // databaseURL: 'https://sis-tstindo-default-rtdb.asia-southeast1.firebasedatabase.app',
-  // Jika region US (Iowa), biarkan kosong.
+  databaseURL: 'https://sis-tstindo-default-rtdb.asia-southeast1.firebasedatabase.app',
 };
