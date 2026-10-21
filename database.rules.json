@@ -8,17 +8,25 @@
       "usher": {
         "$uid": {
           ".read": "auth!=null&&auth.uid===$uid",
-          ".write": false
+          ".write": "auth!=null&&auth.uid===$uid&&(!newData.exists()||(newData.isString()&&root.child('interpreter/usherDaftar/'+newData.val()).exists()))"
+        }
+      },
+      "usherDaftar": {
+        ".read": false,
+        "$key": {
+          ".read": "auth!=null",
+          ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+          ".validate": "$key.matches(/^62[0-9]{8,13}$/)&&newData.isString()&&newData.val().length>0&&newData.val().length<=80"
         }
       },
       "config": {
         ".read": "auth!=null",
-        ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true"
+        ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()"
       },
       "pinjam": {
-        ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true",
+        ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
         "$id": {
-          ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true)||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.parent().parent().child('aktif').child(newData.child('receiver').val()).val()===$id)",
+          ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.parent().parent().child('aktif').child(newData.child('receiver').val()).val()===$id)",
           ".validate": "newData.hasChildren(['nama','hp','institusi','receiver','waktu','status'])",
           "nama": {
             ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=80"
@@ -53,9 +61,9 @@
         }
       },
       "aktif": {
-        ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true",
+        ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
         "$rcv": {
-          ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true)||(auth!=null&&!data.exists())",
+          ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists())",
           ".validate": "$rcv.matches(/^[A-Z0-9-]{1,6}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).exists()"
         }
       }
