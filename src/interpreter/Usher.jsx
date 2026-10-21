@@ -46,7 +46,19 @@ function Login({ onOk }) {
       if (s.exists()) onOk();
       else setErr('Email & password benar, tapi akun ini belum terdaftar sebagai admin. Tambahkan UID ini di Firebase: interpreter/usher/' + cred.user.uid + ' = true');
     } catch (e2) {
-      setErr(e2.code === 'auth/operation-not-allowed' ? 'Metode Email/Password belum diaktifkan di Firebase.' : 'Email atau password salah.');
+      const c = e2.code || 'tidak diketahui';
+      const peta = {
+        'auth/invalid-credential': 'Email atau password salah (atau akun belum dibuat di Firebase).',
+        'auth/wrong-password': 'Password salah.',
+        'auth/user-not-found': 'Email belum terdaftar di Firebase Authentication.',
+        'auth/invalid-email': 'Format email tidak valid.',
+        'auth/too-many-requests': 'Terlalu banyak percobaan. Tunggu beberapa menit lalu coba lagi.',
+        'auth/network-request-failed': 'Koneksi internet bermasalah.',
+        'auth/operation-not-allowed': 'Metode Email/Password belum diaktifkan di Firebase.',
+        'auth/unauthorized-domain': 'Domain ini belum ditambahkan di Firebase Authentication > Settings > Authorized domains.',
+        'PERMISSION_DENIED': 'Login berhasil tapi database menolak membaca. Cek Rules di Firebase.',
+      };
+      setErr((peta[c] || 'Gagal masuk.') + ' (kode: ' + c + ')');
     }
     setBusy(false);
   };
@@ -65,8 +77,8 @@ function Login({ onOk }) {
       ) : (
         <form className="card" onSubmit={masukAdmin}>
           <h2>Login Admin</h2>
-          <label>Email<input value={em} onChange={(e) => setEm(e.target.value)} type="email" required /></label>
-          <label>Password<input value={pw} onChange={(e) => setPw(e.target.value)} type="password" required /></label>
+          <label>Email<input value={em} onChange={(e) => setEm(e.target.value)} type="email" autoCapitalize="none" autoCorrect="off" required /></label>
+          <label>Password<input value={pw} onChange={(e) => setPw(e.target.value)} type="password" autoCapitalize="none" autoCorrect="off" required /></label>
           {err && <div className="err" style={{ wordBreak: 'break-all' }}>{err}</div>}
           <button className="btn primary" disabled={busy}>{busy ? 'Memeriksa…' : 'Masuk'}</button>
           <button type="button" className="link" onClick={() => { setAdmin(false); setErr(''); }}>Kembali ke login Usher</button>
