@@ -39,8 +39,16 @@ function Login({ onOk }) {
   const masukAdmin = async (e) => {
     e.preventDefault();
     setErr('');
-    try { await signInWithEmailAndPassword(auth, em.trim(), pw); }
-    catch { setErr('Email atau password salah.'); }
+    setBusy(true);
+    try {
+      const cred = await signInWithEmailAndPassword(auth, em.trim(), pw);
+      const s = await get(ref(db, 'interpreter/usher/' + cred.user.uid));
+      if (s.exists()) onOk();
+      else setErr('Email & password benar, tapi akun ini belum terdaftar sebagai admin. Tambahkan UID ini di Firebase: interpreter/usher/' + cred.user.uid + ' = true');
+    } catch (e2) {
+      setErr(e2.code === 'auth/operation-not-allowed' ? 'Metode Email/Password belum diaktifkan di Firebase.' : 'Email atau password salah.');
+    }
+    setBusy(false);
   };
 
   return (
@@ -59,8 +67,8 @@ function Login({ onOk }) {
           <h2>Login Admin</h2>
           <label>Email<input value={em} onChange={(e) => setEm(e.target.value)} type="email" required /></label>
           <label>Password<input value={pw} onChange={(e) => setPw(e.target.value)} type="password" required /></label>
-          {err && <div className="err">{err}</div>}
-          <button className="btn primary">Masuk</button>
+          {err && <div className="err" style={{ wordBreak: 'break-all' }}>{err}</div>}
+          <button className="btn primary" disabled={busy}>{busy ? 'Memeriksa…' : 'Masuk'}</button>
           <button type="button" className="link" onClick={() => { setAdmin(false); setErr(''); }}>Kembali ke login Usher</button>
         </form>
       )}
