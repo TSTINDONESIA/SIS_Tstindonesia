@@ -53,6 +53,7 @@
         }
       },
       "aktif": {
+        ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true",
         "$rcv": {
           ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===true)||(auth!=null&&!data.exists())",
           ".validate": "$rcv.matches(/^[A-Z0-9-]{1,6}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).exists()"
