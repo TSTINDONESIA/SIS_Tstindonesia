@@ -1,31 +1,69 @@
 import { useEffect, useMemo, useState } from 'react';
-import { onAuthStateChanged, signInWithEmailAndPassword, signOut } from 'firebase/auth';
-import { ref, onValue, update, push, remove, get, serverTimestamp } from 'firebase/database';
+import { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, signOut } from 'firebase/auth';
+import { ref, onValue, update, push, remove, get, set, serverTimestamp } from 'firebase/database';
 import QRCode from 'qrcode';
 import { auth, db } from '../firebase.js';
-import { waLink, fmtJam, fmtTgl, DEFAULT_PESAN } from './util.js';
+import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN } from './util.js';
 
 const natural = (a, b) => String(a.receiver).localeCompare(String(b.receiver), undefined, { numeric: true });
 
-function Login() {
+function Login({ onOk }) {
+  const [nama, setNama] = useState('');
+  const [hp, setHp] = useState('');
   const [em, setEm] = useState('');
   const [pw, setPw] = useState('');
+  const [admin, setAdmin] = useState(false);
   const [err, setErr] = useState('');
-  const go = async (e) => {
+  const [busy, setBusy] = useState(false);
+
+  const masuk = async (e) => {
+    e.preventDefault();
+    setErr('');
+    const key = waNum(hp);
+    if (!nama.trim() || !/^62[0-9]{8,13}$/.test(key)) return setErr('Isi nama dan nomor HP/WhatsApp dengan benar.');
+    setBusy(true);
+    try {
+      const u = auth.currentUser || (await signInAnonymously(auth)).user;
+      const s = await get(ref(db, 'interpreter/usherDaftar/' + key));
+      const cocok = s.exists() && String(s.val()).trim().toLowerCase() === nama.trim().toLowerCase();
+      if (!cocok) {
+        setErr('Nama atau nomor HP belum terdaftar sebagai Usher. Minta Usher lain menambahkan Anda di tab Pengaturan.');
+      } else {
+        await set(ref(db, 'interpreter/usher/' + u.uid), key);
+        onOk();
+      }
+    } catch (e2) { setErr('Gagal masuk (kode: ' + (e2.code || 'tidak diketahui') + '). Cek internet lalu coba lagi.'); }
+    setBusy(false);
+  };
+
+  const masukAdmin = async (e) => {
     e.preventDefault();
     setErr('');
     try { await signInWithEmailAndPassword(auth, em.trim(), pw); }
     catch { setErr('Email atau password salah.'); }
   };
+
   return (
     <div className="wrap">
-      <form className="card" onSubmit={go}>
-        <h2>Login Usher</h2>
-        <label>Email<input value={em} onChange={(e) => setEm(e.target.value)} type="email" required /></label>
-        <label>Password<input value={pw} onChange={(e) => setPw(e.target.value)} type="password" required /></label>
-        {err && <div className="err">{err}</div>}
-        <button className="btn primary">Masuk</button>
-      </form>
+      {!admin ? (
+        <form className="card" onSubmit={masuk}>
+          <h2>Login Usher</h2>
+          <label>Nama<input value={nama} onChange={(e) => setNama(e.target.value)} autoComplete="name" required /></label>
+          <label>Nomor HP / WhatsApp<input value={hp} onChange={(e) => setHp(e.target.value)} type="tel" inputMode="tel" placeholder="08123456789" required /></label>
+          {err && <div className="err">{err}</div>}
+          <button className="btn primary" disabled={busy}>{busy ? 'Memeriksa…' : 'Masuk'}</button>
+          <button type="button" className="link" onClick={() => { setAdmin(true); setErr(''); }}>Login admin (email)</button>
+        </form>
+      ) : (
+        <form className="card" onSubmit={masukAdmin}>
+          <h2>Login Admin</h2>
+          <label>Email<input value={em} onChange={(e) => setEm(e.target.value)} type="email" required /></label>
+          <label>Password<input value={pw} onChange={(e) => setPw(e.target.value)} type="password" required /></label>
+          {err && <div className="err">{err}</div>}
+          <button className="btn primary">Masuk</button>
+          <button type="button" className="link" onClick={() => { setAdmin(false); setErr(''); }}>Kembali ke login Usher</button>
+        </form>
+      )}
     </div>
   );
 }
@@ -48,19 +86,27 @@ function Pengaturan({ cfg }) {
   };
   const tambah = async () => {
     if (!nama.trim() || !hp.trim()) return;
-    await push(ref(db, 'interpreter/config/bantuan'), { nama: nama.trim(), hp: hp.trim() });
-    setNama(''); setHp('');
+    const key = waNum(hp);
+    if (!/^62[0-9]{8,13}$/.test(key)) return alert('Nomor HP tidak valid.');
+    const id = push(ref(db, 'interpreter/config/bantuan')).key;
+    try {
+      await update(ref(db, 'interpreter'), {
+        ['config/bantuan/' + id]: { nama: nama.trim(), hp: hp.trim() },
+        ['usherDaftar/' + key]: nama.trim(),
+      });
+      setNama(''); setHp('');
+    } catch { alert('Gagal menambah Usher.'); }
   };
 
   return (
     <>
       <div className="card">
-        <h3>Nomor Usher untuk bantuan tamu</h3>
-        <p className="muted">Tampil di halaman tamu sebagai tombol WhatsApp.</p>
+        <h3>Daftar Usher</h3>
+        <p className="muted">Nama + nomor WA. Usher di daftar ini bisa login, dan nomornya tampil di halaman tamu sebagai tombol WhatsApp.</p>
         {bantuan.map(([id, u]) => (
           <div className="row" key={id}>
             <span>{u.nama} · {u.hp}</span>
-            <button className="link danger" onClick={() => remove(ref(db, 'interpreter/config/bantuan/' + id))}>Hapus</button>
+            <button className="link danger" onClick={() => update(ref(db, 'interpreter'), { ['config/bantuan/' + id]: null, ['usherDaftar/' + waNum(u.hp)]: null }).catch(() => alert('Gagal menghapus.'))}>Hapus</button>
           </div>
         ))}
         <input placeholder="Nama usher" value={nama} onChange={(e) => setNama(e.target.value)} />
@@ -177,14 +223,19 @@ function Dashboard({ user }) {
 
   const list = cari(tab === 'aktif' ? aktif : kembali);
 
+  const keluar = async () => {
+    try { if (user.isAnonymous) await remove(ref(db, 'interpreter/usher/' + user.uid)); } catch { /* abaikan */ }
+    signOut(auth);
+  };
+
   return (
     <div className="wrap wide">
       <div className="head">
         <div>
           <h1>Usher · Interpreter</h1>
-          <div className="muted">{cfg.acara || user.email}</div>
+          <div className="muted">{cfg.acara || 'Usher'}</div>
         </div>
-        <button className="link" onClick={() => signOut(auth)}>Keluar</button>
+        <button className="link" onClick={keluar}>Keluar</button>
       </div>
 
       <div className="stats">
@@ -253,25 +304,20 @@ function Dashboard({ user }) {
 export default function Usher() {
   const [user, setUser] = useState(undefined);
   const [ok, setOk] = useState(null);
+  const [ver, setVer] = useState(0);
 
-  // tamu (anonim) tidak dianggap login usher
-  useEffect(() => onAuthStateChanged(auth, (u) => setUser(u && !u.isAnonymous ? u : null)), []);
+  useEffect(() => onAuthStateChanged(auth, (u) => setUser(u || null)), []);
   useEffect(() => {
     if (!user) { setOk(null); return; }
-    get(ref(db, 'interpreter/usher/' + user.uid)).then((s) => setOk(s.val() === true)).catch(() => setOk(false));
-  }, [user]);
+    let batal = false;
+    get(ref(db, 'interpreter/usher/' + user.uid))
+      .then((s) => { if (!batal) setOk(s.exists()); })
+      .catch(() => { if (!batal) setOk(false); });
+    return () => { batal = true; };
+  }, [user, ver]);
 
   if (user === undefined) return <div className="wrap"><p className="muted center">Memuat…</p></div>;
-  if (!user) return <Login />;
+  if (!user || ok === false) return <Login onOk={() => setVer((v) => v + 1)} />;
   if (ok === null) return <div className="wrap"><p className="muted center">Memeriksa akses…</p></div>;
-  if (!ok) {
-    return (
-      <div className="wrap"><div className="card center">
-        <h2>Tidak ada akses</h2>
-        <p className="muted">Akun ini belum didaftarkan sebagai Usher.<br />UID: {user.uid}</p>
-        <button className="btn" onClick={() => signOut(auth)}>Keluar</button>
-      </div></div>
-    );
-  }
   return <Dashboard user={user} />;
 }
