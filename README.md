@@ -55,3 +55,21 @@ Satu project Firebase, banyak ruangan/acara. **Acara utama lama tidak berubah**:
 - **Usher**: tiap peminjam menampilkan ikon + nama jaminan, dan dialog "Sudah kembali" mengingatkan jaminan mana yang harus dikembalikan. Kolom Jaminan ikut di CSV/PDF.
 - Hanya JENIS jaminan yang dicatat, bukan nomor KTP/password. Password tidak diketik di web.
 - **Tempel ulang `database.rules.json`** (field `jaminan`, `kembaliOleh`, `kembaliOlehHp`) lalu Publish.
+
+## Siklus acara (v1.6) - dipakai ulang tiap event
+Tiap acara/ruangan adalah satu unit yang dibuat, dipakai, lalu diarsipkan. Tidak ada setelan permanen per event.
+
+**Super Admin (`#/admin`)**
+1. **Buat acara**: nama, tanggal, jam, **jumlah alat dipesan**, dan *Salin pengaturan dari acara* (teknisi, teks pengingat, channel, jaminan, opsional petugas) supaya event berikutnya tinggal salin dari event sebelumnya.
+2. **👥 Petugas**: tugaskan Usher untuk acara itu. **Usher hanya bisa melihat acara yang ditugaskan kepadanya** (dijaga di Rules lewat indeks `interpreter/tugas/<nomor>/<acara>`), tidak bisa melihat daftar atau data acara lain.
+3. **🪪 Jaminan**: aktifkan dan pilih jenisnya.
+4. **QR** untuk tamu, cetak.
+5. Setelah acara: **🗄️ Arsipkan**. Tamu tidak bisa mendaftar lagi (dijaga di Rules), acara hilang dari daftar Usher, data tetap ada dan bisa **↩ Buka arsip**. Unduh PDF/CSV sebelum menghapus.
+
+**Usher** (dashboard acara)
+- Kartu **📦 Stok alat**: Dipesan / Diterima / Dipinjam / Tersedia. **＋ Terima receiver dari teknisi** saat teknisi TST menyerahkan alat ke Usher, **↩ Kembalikan ke teknisi** saat alat diserahkan balik di akhir acara. Tiap catatan menyimpan jumlah, nama teknisi, nama Usher yang mencatat, waktu. Muncul peringatan saat stok menipis (≤3). Ringkasan stok dan riwayatnya ikut di laporan PDF/CSV.
+- Tamu scan QR -> isi data + jaminan + nomor receiver -> Usher menandai **Sudah kembali** (jaminan diingatkan).
+
+**Acara utama (lama)** sekarang juga dibatasi: hanya Super Admin dan Usher di *Daftar Usher* acara utama. Saat Super Admin pertama kali membuka `#/admin`, Usher yang sudah ada di daftar itu otomatis ditugaskan, jadi tidak ada yang terkunci.
+
+**PENTING**: tempel ulang `database.rules.json` (ada node baru `tugas`, `stok`, field `arsip`, `jumlah`) lalu Publish. Buka `#/admin` sekali sebagai Super Admin setelah update untuk sinkron penugasan.

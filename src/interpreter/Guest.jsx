@@ -290,6 +290,16 @@ export default function Guest({ rid = '' }) {
     );
   }
 
+  // ====== acara sudah diarsipkan: pendaftaran ditutup ======
+  if (cfg.arsip) {
+    return (
+      <div className="wrap">
+        {head}
+        <div className="card center"><div className="big">🏁</div><p>{t.roomClosed}</p></div>
+      </div>
+    );
+  }
+
   // ====== form pendaftaran (baru / tambah alat) ======
   return (
     <div className="wrap">

@@ -111,3 +111,10 @@ a.btn,a.link{text-decoration:none}
 .jamset{display:flex;flex-direction:column;gap:8px}
 .jamset label.chk{flex-direction:row;align-items:center;gap:10px;font-size:14px;font-weight:600}
 .jamset input[type=checkbox]{width:20px;height:20px;padding:0;flex:none}
+
+/* ===== Stok, arsip, form acara ===== */
+.stats.stok{grid-template-columns:repeat(4,1fr)}
+.stoklog{font-size:12px;color:#8FA3C2;gap:8px;border-top:1px solid #1B2D4A;padding-top:6px}
+label.chk{flex-direction:row;align-items:center;gap:10px;font-size:14px;font-weight:600}
+input[type=checkbox]{width:20px;height:20px;padding:0;flex:none}
+.card select{padding:12px;border-radius:10px;border:1px solid #2A4066;background:#06101F;color:#fff;font:inherit;font-size:14px}

@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { ref, onValue, update, push, remove, get, set, serverTimestamp } from 'firebase/database';
 import QRCode from 'qrcode';
@@ -17,6 +17,7 @@ function JaminanChip({ k, kembali }) {
   );
 }
 
+const hitungDiterima = (log) => log.reduce((n, x) => n + (x.jenis === 'retur' ? -x.jumlah : x.jumlah), 0);
 const natural = (a, b) => String(a.receiver).localeCompare(String(b.receiver), undefined, { numeric: true });
 
 function Login({ onOk }) {
@@ -100,6 +101,70 @@ function Login({ onOk }) {
   );
 }
 
+function StokCard({ B, cfg, dipinjam, namaSaya, log }) {
+  const [buka, setBuka] = useState(false);
+  const [jenis, setJenis] = useState('terima');
+  const [jml, setJml] = useState('');
+  const [tek, setTek] = useState('');
+  const [cat, setCat] = useState('');
+  const diterima = hitungDiterima(log);
+  const pesan = Number(cfg.jumlahPesan) || 0;
+  const tersedia = diterima - dipinjam;
+  const bukaForm = (j) => { setJenis(j); setTek(cfg.teknisi?.nama || ''); setBuka(true); };
+  const simpan = async () => {
+    const n = parseInt(jml, 10);
+    if (!(n >= 1 && n <= 9999)) return alert('Isi jumlah alat (angka 1-9999).');
+    try {
+      await push(ref(db, B + '/stok/log'), {
+        jenis, jumlah: n, oleh: namaSaya || 'Usher',
+        ...(tek.trim() ? { teknisi: tek.trim().slice(0, 80) } : {}),
+        ...(cat.trim() ? { catatan: cat.trim().slice(0, 100) } : {}),
+        waktu: serverTimestamp(),
+      });
+      setJml(''); setCat(''); setBuka(false);
+    } catch { alert('Gagal menyimpan. Cek internet dan pastikan Rules terbaru sudah dipasang.'); }
+  };
+  const hapusLog = (x) => { if (confirm('Hapus catatan ini?')) remove(ref(db, B + '/stok/log/' + x.id)).catch(() => alert('Gagal menghapus.')); };
+  return (
+    <div className="card">
+      <h3>📦 Stok alat</h3>
+      <div className="stats stok">
+        <div><b>{pesan || '-'}</b><span>Dipesan</span></div>
+        <div><b>{diterima}</b><span>Diterima</span></div>
+        <div><b>{dipinjam}</b><span>Dipinjam</span></div>
+        <div><b style={{ color: tersedia < 0 ? '#F87171' : tersedia <= 3 && diterima > 0 ? '#FBBF24' : undefined }}>{tersedia}</b><span>Tersedia</span></div>
+      </div>
+      {pesan > 0 && diterima < pesan && <div className="muted">Baru diterima {diterima} dari {pesan} alat pesanan, kurang {pesan - diterima}.</div>}
+      {pesan > 0 && diterima > pesan && <div className="muted">Diterima melebihi pesanan ({diterima - pesan} alat).</div>}
+      {diterima > 0 && tersedia >= 0 && tersedia <= 3 && <div className="warn">⚠️ Stok menipis: tinggal {tersedia} alat di meja. Minta tambahan ke teknisi.</div>}
+      {tersedia < 0 && <div className="err">Alat dipinjam lebih banyak dari yang tercatat diterima. Periksa catatan terima.</div>}
+      {!buka ? (
+        <div className="actions">
+          <button className="btn primary" onClick={() => bukaForm('terima')}>＋ Terima receiver dari teknisi</button>
+          <button className="btn" onClick={() => bukaForm('retur')}>↩ Kembalikan ke teknisi</button>
+        </div>
+      ) : (
+        <>
+          <b>{jenis === 'terima' ? 'Terima receiver dari teknisi' : 'Kembalikan receiver ke teknisi'}</b>
+          <input type="number" inputMode="numeric" min="1" placeholder="Jumlah alat" value={jml} onChange={(e) => setJml(e.target.value)} />
+          <input placeholder={jenis === 'terima' ? 'Nama teknisi yang menyerahkan' : 'Nama teknisi yang menerima'} maxLength={80} value={tek} onChange={(e) => setTek(e.target.value)} />
+          <input placeholder="Catatan (opsional), mis. A001-A050, kondisi baik" maxLength={100} value={cat} onChange={(e) => setCat(e.target.value)} />
+          <div className="actions">
+            <button className="btn primary" onClick={simpan}>Simpan</button>
+            <button className="btn" onClick={() => setBuka(false)}>Batal</button>
+          </div>
+        </>
+      )}
+      {log.slice(0, 6).map((x) => (
+        <div className="row stoklog" key={x.id}>
+          <span>{x.jenis === 'retur' ? '↩ Kembali ke teknisi' : '✓ Terima'} <b>{x.jumlah}</b> alat{x.teknisi ? ` · teknisi ${x.teknisi}` : ''} · dicatat {x.oleh} · {fmtTgl(x.waktu)}{x.catatan ? ` · ${x.catatan}` : ''}</span>
+          <button className="link danger" onClick={() => hapusLog(x)}>Hapus</button>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
   const B = basePath(rid);
   const PX = rid ? 'rooms/' + rid + '/' : '';
@@ -153,6 +218,7 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
       await update(ref(db, 'interpreter'), {
         [PX + 'config/bantuan/' + id]: { nama: nama.trim(), hp: hp.trim() },
         ['usherDaftar/' + key]: nama.trim(),
+        ...(rid ? {} : { ['tugas/' + key + '/_']: true }),
       });
       setNama(''); setHp('');
     } catch { alert('Gagal menambah Usher.'); }
@@ -197,7 +263,7 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
         {bantuan.map(([id, u]) => (
           <div className="row" key={id}>
             <span>{u.nama} · {u.hp}</span>
-            <button className="link danger" onClick={() => update(ref(db, 'interpreter'), rid ? { [PX + 'config/bantuan/' + id]: null } : { ['config/bantuan/' + id]: null, ['usherDaftar/' + waNum(u.hp)]: null }).catch(() => alert('Gagal menghapus.'))}>Hapus</button>
+            <button className="link danger" onClick={() => update(ref(db, 'interpreter'), rid ? { [PX + 'config/bantuan/' + id]: null } : { ['config/bantuan/' + id]: null, ['usherDaftar/' + waNum(u.hp)]: null, ['tugas/' + waNum(u.hp) + '/_']: null }).catch(() => alert('Gagal menghapus.'))}>Hapus</button>
           </div>
         ))}
         <input placeholder="Nama usher" value={nama} onChange={(e) => setNama(e.target.value)} />
@@ -291,9 +357,11 @@ function Penilaian({ nilai, loans }) {
 function Dashboard({ user, rid, isSuper, myKey }) {
   const B = basePath(rid);
   const [rooms, setRooms] = useState([]);
+  const [tugasUtama, setTugasUtama] = useState(false);
   const [denied, setDenied] = useState(false);
   const [loans, setLoans] = useState([]);
   const [nilai, setNilai] = useState({});
+  const [stokLog, setStokLog] = useState([]);
   const [cfg, setCfg] = useState({});
   const [tab, setTab] = useState('aktif');
   const [q, setQ] = useState('');
@@ -317,11 +385,44 @@ function Dashboard({ user, rid, isSuper, myKey }) {
       setLoans(Object.entries(s.val() || {}).map(([id, v]) => ({ id, ...v }))), () => setDenied(true));
     const b = onValue(ref(db, B + '/config'), (s) => setCfg(s.val() || {}), () => {});
     const c = onValue(ref(db, B + '/nilai'), (s) => setNilai(s.val() || {}), () => {});
-    const d = onValue(ref(db, 'interpreter/ruangan'), (s) =>
-      setRooms(Object.entries(s.val() || {}).map(([id, v]) => ({ id, ...v })).sort((x, y) => (x.tanggal + x.mulai).localeCompare(y.tanggal + y.mulai))), () => {});
+    const e = onValue(ref(db, B + '/stok/log'), (s) =>
+      setStokLog(Object.entries(s.val() || {}).map(([id, v]) => ({ id, ...v })).sort((x, y) => (y.waktu || 0) - (x.waktu || 0))), () => {});
     const t = setInterval(() => setNow(Date.now()), 30000);
-    return () => { a(); b(); c(); d(); clearInterval(t); };
+    return () => { a(); b(); c(); e(); clearInterval(t); };
   }, [B]);
+
+  // daftar acara: Super Admin melihat semua; Usher hanya yang ditugaskan (indeks interpreter/tugas/<nomor>)
+  useEffect(() => {
+    const urut = (m) => Object.values(m).sort((x, y) => (x.tanggal + x.mulai).localeCompare(y.tanggal + y.mulai));
+    if (isSuper) {
+      setTugasUtama(true);
+      return onValue(ref(db, 'interpreter/ruangan'), (s) => setRooms(urut(Object.fromEntries(Object.entries(s.val() || {}).map(([id, v]) => [id, { id, ...v }])))), () => {});
+    }
+    if (!myKey) { setRooms([]); setTugasUtama(false); return; }
+    let dalam = [];
+    const m = {};
+    const luar = onValue(ref(db, 'interpreter/tugas/' + myKey), (s) => {
+      dalam.forEach((f) => f()); dalam = [];
+      Object.keys(m).forEach((k) => delete m[k]);
+      const t = s.val() || {};
+      setTugasUtama(!!t._);
+      setRooms([]);
+      Object.keys(t).filter((k) => k !== '_').forEach((id) => {
+        dalam.push(onValue(ref(db, 'interpreter/ruangan/' + id), (sn) => {
+          if (sn.exists()) m[id] = { id, ...sn.val() }; else delete m[id];
+          setRooms(urut(m));
+        }, () => {}));
+      });
+    }, () => {});
+    return () => { luar(); dalam.forEach((f) => f()); };
+  }, [isSuper, myKey]);
+
+  useEffect(() => {
+    if (denied && !rid && !isSuper) {
+      const p = rooms.find((r) => !r.arsip);
+      if (p) location.hash = '#/usher/' + p.id;
+    }
+  }, [denied, rooms, rid, isSuper]);
 
   const aktif = useMemo(() => loans.filter((l) => l.status === 'dipinjam'), [loans]);
   const kembali = useMemo(() => loans.filter((l) => l.status === 'kembali'), [loans]);
@@ -464,6 +565,12 @@ function Dashboard({ user, rid, isSuper, myKey }) {
   const csv = () => {
     const rows = [['Receiver', 'Nama', 'WhatsApp/Email', 'Institusi', 'Jaminan', 'Status', 'Waktu pinjam', 'Waktu kembali', 'Diterima oleh', 'Nilai pelayanan', 'Nilai alat', 'Komentar']]
       .concat([...loans].sort(natural).map((l) => [l.receiver, l.nama, l.hp, l.institusi, jaminanInfo(l.jaminan)?.id ?? '', l.status, fmtTgl(l.waktu), fmtTgl(l.kembaliWaktu), l.kembaliOleh ?? '', nilai[l.id]?.pelayanan ?? '', nilai[l.id]?.alat ?? '', nilai[l.id]?.komentar ?? '']));
+    const dt = hitungDiterima(stokLog);
+    rows.push([], ['STOK ALAT'], ['Dipesan', cfg.jumlahPesan ?? ''], ['Diterima dari teknisi', dt], ['Masih dipinjam', aktif.length], ['Tersedia', dt - aktif.length]);
+    if (stokLog.length) {
+      rows.push([], ['Waktu', 'Jenis', 'Jumlah', 'Teknisi', 'Dicatat oleh', 'Catatan']);
+      [...stokLog].reverse().forEach((x) => rows.push([fmtTgl(x.waktu), x.jenis === 'retur' ? 'Kembali ke teknisi' : 'Terima dari teknisi', x.jumlah, x.teknisi ?? '', x.oleh ?? '', x.catatan ?? '']));
+    }
     const text = rows.map((r) => r.map((c) => `"${String(c ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv' }));
@@ -492,6 +599,8 @@ function Dashboard({ user, rid, isSuper, myKey }) {
         `Total ${loans.length} alat  |  Masih dipinjam ${aktif.length}  |  Sudah kembali ${loans.length - aktif.length}  |  ` +
         `Rata-rata penilaian: pelayanan ${rata(nv.map((x) => x.pelayanan))}/5, alat ${rata(nv.map((x) => x.alat))}/5 (${nv.length} penilaian)`,
         40, 88);
+      const dt = hitungDiterima(stokLog);
+      doc.text(`Stok alat: dipesan ${cfg.jumlahPesan ?? '-'}  |  diterima dari teknisi ${dt}  |  masih dipinjam ${aktif.length}  |  tersedia ${dt - aktif.length}`, 40, 102);
 
       const footer = () => {
         doc.setFontSize(8);
@@ -499,7 +608,7 @@ function Dashboard({ user, rid, isSuper, myKey }) {
         doc.text('TST Indonesia', 40, H - 18);
       };
       autoTable(doc, {
-        startY: 102,
+        startY: 116,
         head: [['No. Alat', 'Nama', 'WhatsApp / Email', 'Institusi', 'Jaminan', 'Status', 'Pinjam', 'Kembali', 'Diterima oleh', 'Pelayanan', 'Alat']],
         body: urut.map((l) => [
           b(l.receiver), b(l.nama), b(l.hp), b(l.institusi), jaminanInfo(l.jaminan)?.id || '-',
@@ -520,6 +629,16 @@ function Dashboard({ user, rid, isSuper, myKey }) {
           body: kom.map((l) => [b(l.receiver), b(l.nama), b(nilai[l.id].komentar)]),
           styles: { fontSize: 8, cellPadding: 3 },
           headStyles: { fillColor: [217, 119, 6] },
+          didDrawPage: footer,
+        });
+      }
+      if (stokLog.length) {
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 24,
+          head: [['Waktu', 'Jenis', 'Jumlah', 'Teknisi', 'Dicatat oleh', 'Catatan']],
+          body: [...stokLog].reverse().map((x) => [fmtTgl(x.waktu), x.jenis === 'retur' ? 'Kembali ke teknisi' : 'Terima dari teknisi', x.jumlah, b(x.teknisi) || '-', b(x.oleh) || '-', b(x.catatan) || '-']),
+          styles: { fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [22, 101, 52] },
           didDrawPage: footer,
         });
       }
@@ -553,12 +672,14 @@ function Dashboard({ user, rid, isSuper, myKey }) {
     signOut(auth);
   };
 
-  const boleh = rooms.filter((r) => isSuper || (myKey && r.petugas && r.petugas[myKey]));
+  const boleh = rooms.filter((r) => isSuper || !r.arsip);
   if (denied) {
     return (
       <div className="wrap"><div className="card center"><div className="big">🔒</div>
-        <p>Anda belum ditugaskan di ruangan ini. Hubungi Super Admin.</p>
-        <a className="btn" href="#/usher">← Acara utama</a></div></div>
+        <p>Anda belum ditugaskan di acara ini. Hubungi Super Admin.</p>
+        {boleh.length > 0 && <><p className="muted">Acara yang ditugaskan kepada Anda:</p>
+          {boleh.map((r) => <a key={r.id} className="btn" href={'#/usher/' + r.id}>{r.nama} · {r.tanggal} {r.mulai}</a>)}</>}
+        <button className="link" onClick={keluar}>Keluar</button></div></div>
     );
   }
 
@@ -576,18 +697,22 @@ function Dashboard({ user, rid, isSuper, myKey }) {
       {(boleh.length > 0 || isSuper) && (
         <div className="roombar">
           <select value={rid} onChange={(e) => { location.hash = e.target.value ? '#/usher/' + e.target.value : '#/usher'; }}>
-            <option value="">Acara utama (default)</option>
-            {boleh.map((r) => <option key={r.id} value={r.id}>{r.nama} · {r.tanggal} {r.mulai}</option>)}
+            {(isSuper || tugasUtama) && <option value="">Acara utama (default)</option>}
+            {boleh.map((r) => <option key={r.id} value={r.id}>{r.nama} · {r.tanggal} {r.mulai}{r.arsip ? ' (arsip)' : ''}</option>)}
           </select>
           {isSuper && <a className="link" href="#/admin">⚙️ Kelola ruangan</a>}
         </div>
       )}
+
+      {cfg.arsip && <div className="warn">🗄️ Acara ini sudah diarsipkan: tamu tidak bisa mendaftar lagi.</div>}
 
       <div className="stats">
         <div><b>{aktif.length}</b><span>Belum kembali</span></div>
         <div><b>{kembali.length}</b><span>Sudah kembali</span></div>
         <div><b>{loans.length}</b><span>Total</span></div>
       </div>
+
+      <StokCard B={B} cfg={cfg} dipinjam={aktif.length} namaSaya={namaSaya} log={stokLog} />
 
       <div className="card" style={{ borderColor: '#2F5FB3' }}>
         {!tukar ? (
@@ -742,7 +867,13 @@ const hariIni = () => { const d = new Date(); return `${d.getFullYear()}-${Strin
 function Admin() {
   const [rooms, setRooms] = useState([]);
   const [now, setNow] = useState(Date.now());
-  const [f, setF] = useState({ nama: '', tanggal: hariIni(), mulai: '', selesai: '' });
+  const NEW = () => ({ nama: '', tanggal: hariIni(), mulai: '', selesai: '', jumlah: '', salin: '_', salinPetugas: false });
+  const [f, setF] = useState(NEW);
+  const [roomsOk, setRoomsOk] = useState(false);
+  const [utamaOk, setUtamaOk] = useState(false);
+  const [jumMain, setJumMain] = useState('');
+  const [lihatArsip, setLihatArsip] = useState(false);
+  const synced = useRef(false);
   const [edit, setEdit] = useState('');     // id ruangan yang sedang diubah ('' = buat baru)
   const [qrId, setQrId] = useState('');
   const [busy, setBusy] = useState(false);
@@ -754,15 +885,45 @@ function Admin() {
   const linkTamu = (id) => base + '#/r/' + id;
 
   useEffect(() => {
-    const a = onValue(ref(db, 'interpreter/ruangan'), (sn) =>
-      setRooms(Object.entries(sn.val() || {}).map(([id, v]) => ({ id, ...v })).sort((x, y) => (x.tanggal + x.mulai).localeCompare(y.tanggal + y.mulai))), () => {});
-    const u = onValue(ref(db, 'interpreter/config/bantuan'), (sn) => setUtama(Object.values(sn.val() || {})), () => {});
+    const a = onValue(ref(db, 'interpreter/ruangan'), (sn) => {
+      setRooms(Object.entries(sn.val() || {}).map(([id, v]) => ({ id, ...v })).sort((x, y) => (x.tanggal + x.mulai).localeCompare(y.tanggal + y.mulai)));
+      setRoomsOk(true);
+    }, () => {});
+    const u = onValue(ref(db, 'interpreter/config'), (sn) => {
+      const v = sn.val() || {};
+      setUtama(Object.values(v.bantuan || {}));
+      setJumMain(v.jumlahPesan != null ? String(v.jumlahPesan) : '');
+      setUtamaOk(true);
+    }, () => {});
     const t = setInterval(() => setNow(Date.now()), 30000);
     return () => { a(); u(); clearInterval(t); };
   }, []);
 
   const set_ = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const reset = () => { setEdit(''); setF({ nama: '', tanggal: hariIni(), mulai: '', selesai: '' }); };
+  const reset = () => { setEdit(''); setF(NEW()); };
+
+  // Sinkron penugasan: pastikan indeks tugas/<nomor>/<acara> ada untuk semua petugas yang sudah terdaftar (data lama)
+  useEffect(() => {
+    if (synced.current || !utamaOk || !roomsOk) return;
+    synced.current = true;
+    const upd = {};
+    utama.forEach((u) => { const k = waNum(u.hp); if (/^62[0-9]{8,13}$/.test(k)) upd['tugas/' + k + '/_'] = true; });
+    rooms.forEach((r) => Object.keys(r.petugas || {}).forEach((k) => { upd['tugas/' + k + '/' + r.id] = true; }));
+    if (Object.keys(upd).length) update(ref(db, 'interpreter'), upd).catch(() => {});
+  }, [utamaOk, roomsOk, utama, rooms]);
+
+  const simpanJumMain = async () => {
+    const n = jumMain === '' ? null : parseInt(jumMain, 10);
+    if (n != null && !(n >= 0 && n <= 100000)) return alert('Jumlah alat tidak valid.');
+    try { await update(ref(db, 'interpreter'), { 'config/jumlahPesan': n }); alert('Jumlah alat pesanan acara utama tersimpan.'); }
+    catch { alert('Gagal menyimpan.'); }
+  };
+  const arsipkan = async (r) => {
+    const baru = !r.arsip;
+    if (baru && !confirm(`Arsipkan "${r.nama}"?\nTamu tidak bisa mendaftar lagi dan acara hilang dari daftar Usher. Data tetap tersimpan, bisa dibuka lagi.`)) return;
+    try { await update(ref(db, 'interpreter'), { ['ruangan/' + r.id + '/arsip']: baru ? true : null, ['rooms/' + r.id + '/config/arsip']: baru ? true : null }); }
+    catch { alert('Gagal mengubah status arsip.'); }
+  };
 
   const simpan = async () => {
     const nama = f.nama.trim();
@@ -774,8 +935,12 @@ function Admin() {
       id = dasar; let n = 2;
       while (rooms.some((r) => r.id === id)) id = (dasar.slice(0, 26) + '-' + n++);
     }
+    const jml = f.jumlah === '' ? null : parseInt(f.jumlah, 10);
+    if (jml != null && !(jml >= 0 && jml <= 100000)) return alert('Jumlah alat pesanan tidak valid.');
     const data = { nama, tanggal: f.tanggal, mulai: f.mulai, selesai: f.selesai };
     const upd = {
+      ['ruangan/' + id + '/jumlah']: jml,
+      ['rooms/' + id + '/config/jumlahPesan']: jml,
       ['ruangan/' + id + '/nama']: nama,
       ['ruangan/' + id + '/tanggal']: f.tanggal,
       ['ruangan/' + id + '/mulai']: f.mulai,
@@ -787,12 +952,26 @@ function Admin() {
     setBusy(true);
     try {
       if (!edit) {
-        // ruangan baru: salin nomor teknisi dan teks pengingat dari acara utama (daftar Usher mulai kosong)
-        const c = (await get(ref(db, 'interpreter/config'))).val() || {};
-        ['teknisi', 'pesan'].forEach((k) => { if (c[k] != null) upd['rooms/' + id + '/config/' + k] = c[k]; });
+        // acara baru: salin pengaturan dari acara lain (teknisi, teks pengingat, channel, jaminan, opsional petugas)
+        const src = f.salin;
+        if (src) {
+          const c = (await get(ref(db, (src === '_' ? 'interpreter' : 'interpreter/rooms/' + src) + '/config'))).val() || {};
+          ['teknisi', 'pesan', 'channels', 'jaminan'].forEach((k) => { if (c[k] != null) upd['rooms/' + id + '/config/' + k] = c[k]; });
+          if (f.salinPetugas) {
+            const peta = {};
+            if (src === '_') Object.values(c.bantuan || {}).forEach((u) => { peta[waNum(u.hp)] = { nama: u.nama, hp: u.hp }; });
+            else Object.entries(rooms.find((x) => x.id === src)?.petugas || {}).forEach(([k, nm]) => { peta[k] = { nama: nm, hp: c.bantuan?.[k]?.hp || k }; });
+            Object.entries(peta).forEach(([k, u]) => {
+              if (!/^62[0-9]{8,13}$/.test(k)) return;
+              upd['ruangan/' + id + '/petugas/' + k] = u.nama;
+              upd['rooms/' + id + '/config/bantuan/' + k] = { nama: u.nama, hp: u.hp };
+              upd['tugas/' + k + '/' + id] = true;
+            });
+          }
+        }
       }
       await update(ref(db, 'interpreter'), upd);
-      alert(edit ? 'Jadwal ruangan diperbarui.' : 'Ruangan dibuat. Isi daftar channel di dashboard ruangan (tab Pengaturan), lalu cetak QR-nya.');
+      alert(edit ? 'Acara diperbarui.' : 'Acara dibuat. Cek channel di dashboard acara (tab Pengaturan), tugaskan petugas, lalu cetak QR-nya.');
       reset();
     } catch (e) { alert('Gagal menyimpan (' + (e.code || '?') + '). Pastikan akun ini terdaftar sebagai Super Admin dan Rules terbaru sudah dipasang.'); }
     setBusy(false);
@@ -808,6 +987,7 @@ function Admin() {
       const upd = {
         ['ruangan/' + r.id + '/petugas/' + key]: ada || nama,
         ['rooms/' + r.id + '/config/bantuan/' + key]: { nama: ada || nama, hp: pt.hp.trim() },
+        ['tugas/' + key + '/' + r.id]: true,
       };
       if (ada == null) upd['usherDaftar/' + key] = nama;
       await update(ref(db, 'interpreter'), upd);
@@ -817,7 +997,7 @@ function Admin() {
   };
   const lepasPetugas = (r, key) => {
     if (!confirm('Lepas petugas ini dari ruangan? Hak login-nya tidak dicabut.')) return;
-    update(ref(db, 'interpreter'), { ['ruangan/' + r.id + '/petugas/' + key]: null, ['rooms/' + r.id + '/config/bantuan/' + key]: null })
+    update(ref(db, 'interpreter'), { ['ruangan/' + r.id + '/petugas/' + key]: null, ['rooms/' + r.id + '/config/bantuan/' + key]: null, ['tugas/' + key + '/' + r.id]: null })
       .catch(() => alert('Gagal melepas petugas.'));
   };
 
@@ -825,7 +1005,11 @@ function Admin() {
     const ketik = prompt(`HAPUS ruangan "${r.nama}" beserta seluruh data peminjaman & penilaiannya?\nTidak bisa dibatalkan. Ketik nama ruangan untuk melanjutkan:`);
     if (ketik == null) return;
     if (ketik.trim() !== r.nama) return alert('Nama tidak cocok. Tidak ada yang dihapus.');
-    try { await update(ref(db, 'interpreter'), { ['ruangan/' + r.id]: null, ['rooms/' + r.id]: null }); }
+    try {
+      const upd = { ['ruangan/' + r.id]: null, ['rooms/' + r.id]: null };
+      Object.keys(r.petugas || {}).forEach((k) => { upd['tugas/' + k + '/' + r.id] = null; });
+      await update(ref(db, 'interpreter'), upd);
+    }
     catch { alert('Gagal menghapus.'); }
   };
   const salin = (t) => { (navigator.clipboard?.writeText(t) || Promise.reject()).then(() => alert('Link disalin.')).catch(() => prompt('Salin link ini:', t)); };
@@ -846,16 +1030,29 @@ function Admin() {
       </div>
 
       <div className="card">
-        <h3>{edit ? 'Ubah jadwal ruangan' : '＋ Ruangan / acara baru'}</h3>
+        <h3>{edit ? 'Ubah acara' : '＋ Acara / ruangan baru'}</h3>
         <label>Nama ruangan / acara<input value={f.nama} onChange={set_('nama')} maxLength={60} placeholder="mis. Ruang B · Seminar Siang" disabled={!!edit} /></label>
         <label>Tanggal<input type="date" value={f.tanggal} onChange={set_('tanggal')} /></label>
         <div className="row2">
           <label>Mulai<input type="time" value={f.mulai} onChange={set_('mulai')} /></label>
           <label>Selesai (batas pengembalian)<input type="time" value={f.selesai} onChange={set_('selesai')} /></label>
         </div>
-        {!edit && <p className="muted">Nomor teknisi dan teks pengingat disalin dari acara utama. Daftar Usher dan daftar channel mulai kosong, isi di Pengaturan dashboard ruangan.</p>}
+        <label>Jumlah alat dipesan<input type="number" min="0" inputMode="numeric" value={f.jumlah} onChange={set_('jumlah')} placeholder="mis. 150" /></label>
+        {!edit && (
+          <>
+            <label>Salin pengaturan dari acara
+              <select value={f.salin} onChange={set_('salin')}>
+                <option value="_">Acara utama (default)</option>
+                {rooms.map((x) => <option key={x.id} value={x.id}>{x.nama} · {x.tanggal}</option>)}
+                <option value="">Kosong (mulai dari nol)</option>
+              </select>
+            </label>
+            <span className="muted fine">Yang disalin: nomor teknisi, teks pengingat, daftar channel, dan pengaturan jaminan. Data peminjaman tidak ikut.</span>
+            {f.salin && <label className="chk"><input type="checkbox" checked={f.salinPetugas} onChange={(e) => setF({ ...f, salinPetugas: e.target.checked })} /> Salin juga daftar petugas</label>}
+          </>
+        )}
         <div className="actions">
-          <button className="btn primary" disabled={busy} onClick={simpan}>{edit ? 'Simpan perubahan' : 'Buat ruangan'}</button>
+          <button className="btn primary" disabled={busy} onClick={simpan}>{edit ? 'Simpan perubahan' : 'Buat acara'}</button>
           {edit && <button className="btn" onClick={reset}>Batal</button>}
         </div>
       </div>
@@ -864,17 +1061,21 @@ function Admin() {
         <h3>Acara utama (default)</h3>
         <p className="muted">Alamat lama <b>#/</b> dan <b>#/usher</b>. Data tetap seperti semula.</p>
         <a className="btn" href="#/usher">Buka dashboard acara utama</a>
+        <label>Jumlah alat dipesan<input type="number" min="0" inputMode="numeric" value={jumMain} onChange={(e) => setJumMain(e.target.value)} /></label>
+        <button className="btn" onClick={simpanJumMain}>Simpan jumlah alat</button>
+        <span className="muted fine">Petugas acara utama = Daftar Usher di dashboard acara utama → Pengaturan.</span>
         <button className="btn" onClick={() => setJamId(jamId === '_' ? '' : '_')}>🪪 Jaminan</button>
         {jamId === '_' && <JaminanSetting rid="" />}
       </div>
 
-      {rooms.length === 0 && <p className="muted center">Belum ada ruangan tambahan.</p>}
-      {rooms.map((r) => {
+      {rooms.length === 0 && <p className="muted center">Belum ada acara tambahan.</p>}
+      {rooms.some((r) => r.arsip) && <button className="link" onClick={() => setLihatArsip(!lihatArsip)}>{lihatArsip ? 'Sembunyikan' : 'Tampilkan'} arsip ({rooms.filter((r) => r.arsip).length})</button>}
+      {rooms.filter((r) => lihatArsip || !r.arsip).map((r) => {
         const [lbl, cls] = ST[statusRuang(r, now)];
         return (
           <div className="card" key={r.id}>
-            <div className="row"><b>{r.nama}</b><span className={'badge' + cls}>{lbl}</span></div>
-            <span className="muted">{jadwalText(r)}</span>
+            <div className="row"><b>{r.nama}</b><span className={'badge' + (r.arsip ? '' : cls)}>{r.arsip ? '🗄️ Arsip' : lbl}</span></div>
+            <span className="muted">{jadwalText(r)}{r.jumlah != null ? ` · ${r.jumlah} alat dipesan` : ''}</span>
             <span className="muted fine">Link tamu: {linkTamu(r.id)}</span>
             <div className="actions">
               <a className="btn primary" href={'#/usher/' + r.id}>Dashboard</a>
@@ -882,7 +1083,8 @@ function Admin() {
               <button className="btn" onClick={() => setPtId(ptId === r.id ? '' : r.id)}>👥 Petugas ({Object.keys(r.petugas || {}).length})</button>
               <button className="btn" onClick={() => setJamId(jamId === r.id ? '' : r.id)}>🪪 Jaminan</button>
               <button className="btn" onClick={() => setQrId(qrId === r.id ? '' : r.id)}>QR</button>
-              <button className="btn" onClick={() => { setEdit(r.id); setF({ nama: r.nama, tanggal: r.tanggal, mulai: r.mulai, selesai: r.selesai }); scrollTo(0, 0); }}>Ubah jadwal</button>
+              <button className="btn" onClick={() => { setEdit(r.id); setF({ ...NEW(), nama: r.nama, tanggal: r.tanggal, mulai: r.mulai, selesai: r.selesai, jumlah: r.jumlah != null ? String(r.jumlah) : '' }); scrollTo(0, 0); }}>Ubah</button>
+              <button className="btn" onClick={() => arsipkan(r)}>{r.arsip ? '↩ Buka arsip' : '🗄️ Arsipkan'}</button>
               <button className="link danger" onClick={() => hapus(r)}>Hapus</button>
             </div>
             {jamId === r.id && <JaminanSetting rid={r.id} />}
