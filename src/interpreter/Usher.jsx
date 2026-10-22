@@ -330,24 +330,33 @@ function Dashboard({ user }) {
   };
 
   // ganti nomor alat (alat bermasalah / salah ketik nomor)
-  const gantiAlat = async (l) => {
-    const baru = rcvNorm(prompt(`Ganti nomor alat untuk ${l.nama}.\nNomor sekarang: ${l.receiver}\n\nMasukkan nomor alat PENGGANTI (mis. A001, B001, 01):`, '') || '');
-    if (!baru) return;
-    if (!RCV_OK.test(baru)) return alert('Nomor alat tidak valid (huruf/angka, maks. 8 karakter).');
-    if (rcvKey(baru) === rcvKey(l.receiver)) return alert('Nomornya sama dengan yang sekarang.');
+  const jalankanGanti = async (l, baruRaw, alasan = '') => {
+    const baru = rcvNorm(baruRaw);
+    if (!baru) return false;
+    if (!RCV_OK.test(baru)) { alert('Nomor alat tidak valid (huruf/angka, maks. 8 karakter).'); return false; }
+    if (rcvKey(baru) === rcvKey(l.receiver)) { alert('Nomornya sama dengan yang sekarang.'); return false; }
     const pakai = aktif.find((x) => rcvKey(x.receiver) === rcvKey(baru));
-    if (pakai) return alert(`No. ${baru} sedang dipinjam oleh ${pakai.nama}. Pilih nomor lain, atau tandai alat itu kembali dulu.`);
-    if (!confirm(`Ganti No. ${l.receiver} → No. ${baru} untuk ${l.nama}?\n(No. ${l.receiver} akan bebas dipinjam lagi.)`)) return;
+    if (pakai) { alert(`No. ${baru} sedang dipinjam oleh ${pakai.nama}. Pilih nomor lain, atau tandai alat itu kembali dulu.`); return false; }
+    if (!confirm(`Tukar alat ${l.nama}:\nNo. ${l.receiver} → No. ${baru}${alasan ? `\nAlasan: ${alasan}` : ''}\n\n(No. ${l.receiver} akan bebas dipinjam lagi — pastikan alat yang error dipisahkan.)`)) return false;
     try {
       await update(ref(db, 'interpreter'), {
         [`pinjam/${l.id}/receiver`]: baru,
         [`pinjam/${l.id}/kunci`]: rcvKey(baru),
-        [`pinjam/${l.id}/catatanGanti`]: ((l.catatanGanti ? l.catatanGanti + '; ' : '') + `${l.receiver}→${baru} (${fmtJam(Date.now())})`).slice(-200),
+        [`pinjam/${l.id}/catatanGanti`]: ((l.catatanGanti ? l.catatanGanti + '; ' : '') + `${l.receiver}→${baru}${alasan ? ' [' + alasan + ']' : ''} (${fmtJam(Date.now())})`).slice(-200),
         [`aktif/${kAlat(l)}`]: null,
         [`aktif/${l.receiver}`]: null,
         [`aktif/${rcvKey(baru)}`]: l.id,
       });
-    } catch { alert('Gagal mengganti nomor alat. Pastikan Rules Firebase terbaru sudah di-Publish, lalu coba lagi.'); }
+      return true;
+    } catch { alert('Gagal menukar alat. Pastikan Rules Firebase terbaru sudah di-Publish, lalu coba lagi.'); return false; }
+  };
+  const gantiAlat = (l) => jalankanGanti(l, prompt(`Tukar alat untuk ${l.nama}.\nNomor sekarang: ${l.receiver}\n\nMasukkan nomor alat PENGGANTI (mis. A001, B001, 01):`, '') || '');
+
+  const [tukar, setTukar] = useState(null); // panel "Tukar alat": { lama, baru, alasan }
+  const targetTukar = tukar && tukar.lama ? aktif.find((x) => rcvKey(x.receiver) === rcvKey(tukar.lama)) : null;
+  const prosesTukar = async () => {
+    if (!targetTukar) return alert(`No. ${tukar.lama || '?'} tidak sedang dipinjam. Cek nomor alat yang error.`);
+    if (await jalankanGanti(targetTukar, tukar.baru, tukar.alasan.trim())) setTukar(null);
   };
 
   const kembaliSemua = async (l) => {
@@ -411,6 +420,27 @@ function Dashboard({ user }) {
         <div><b>{aktif.length}</b><span>Belum kembali</span></div>
         <div><b>{kembali.length}</b><span>Sudah kembali</span></div>
         <div><b>{loans.length}</b><span>Total</span></div>
+      </div>
+
+      <div className="card" style={{ borderColor: '#2F5FB3' }}>
+        {!tukar ? (
+          <button className="btn primary" style={{ width: '100%' }} onClick={() => setTukar({ lama: '', baru: '', alasan: '' })}>🔁 Tukar alat (alat error)</button>
+        ) : (
+          <>
+            <h3>🔁 Tukar alat</h3>
+            <p className="muted">Tamu tidak perlu scan atau daftar ulang. Cukup isi nomor alat yang error dan nomor penggantinya.</p>
+            <input placeholder="No. alat LAMA (yang error), mis. A001" value={tukar.lama} autoCapitalize="characters" onChange={(e) => setTukar({ ...tukar, lama: rcvNorm(e.target.value) })} />
+            {tukar.lama && (targetTukar
+              ? <div className="muted">✓ Peminjam: <b>{targetTukar.nama}</b>{targetTukar.institusi ? ` · ${targetTukar.institusi}` : ''}</div>
+              : <div className="muted">Nomor ini tidak sedang dipinjam.</div>)}
+            <input placeholder="No. alat BARU (pengganti), mis. B001" value={tukar.baru} autoCapitalize="characters" onChange={(e) => setTukar({ ...tukar, baru: rcvNorm(e.target.value) })} />
+            <input placeholder="Alasan (opsional), mis. suara putus-putus" maxLength={60} value={tukar.alasan} onChange={(e) => setTukar({ ...tukar, alasan: e.target.value })} />
+            <div className="actions">
+              <button className="btn primary" disabled={!targetTukar || !tukar.baru} onClick={prosesTukar}>Tukar sekarang</button>
+              <button className="btn" onClick={() => setTukar(null)}>Batal</button>
+            </div>
+          </>
+        )}
       </div>
 
       {!cfg.teknisi?.hp && (
