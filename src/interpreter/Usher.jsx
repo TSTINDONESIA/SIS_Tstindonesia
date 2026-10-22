@@ -287,6 +287,18 @@ function Dashboard({ user, rid, isSuper, myKey }) {
   const [q, setQ] = useState('');
   const [queue, setQueue] = useState([]);
   const [now, setNow] = useState(Date.now());
+  const [namaSaya, setNamaSaya] = useState('');
+
+  // nama petugas yang sedang login (dari daftar Usher; akun email memakai emailnya)
+  useEffect(() => {
+    let batal = false;
+    if (!myKey) { setNamaSaya(user.email || ''); return; }
+    get(ref(db, 'interpreter/usherDaftar/' + myKey))
+      .then((s) => { if (!batal) setNamaSaya(s.exists() ? String(s.val()) : ''); })
+      .catch(() => {});
+    return () => { batal = true; };
+  }, [myKey, user]);
+  const penerima = () => ({ kembaliOleh: namaSaya || 'Usher', kembaliOlehHp: myKey || null });
 
   useEffect(() => {
     const a = onValue(ref(db, B + '/pinjam'), (s) =>
@@ -331,6 +343,8 @@ function Dashboard({ user, rid, isSuper, myKey }) {
       await update(ref(db, B), {
         [`pinjam/${l.id}/status`]: 'kembali',
         [`pinjam/${l.id}/kembaliWaktu`]: serverTimestamp(),
+        [`pinjam/${l.id}/kembaliOleh`]: penerima().kembaliOleh,
+        [`pinjam/${l.id}/kembaliOlehHp`]: penerima().kembaliOlehHp,
         [`aktif/${kAlat(l)}`]: null,
       });
       setQ('');
@@ -344,6 +358,8 @@ function Dashboard({ user, rid, isSuper, myKey }) {
       await update(ref(db, B), {
         [`pinjam/${l.id}/status`]: 'dipinjam',
         [`pinjam/${l.id}/kembaliWaktu`]: null,
+        [`pinjam/${l.id}/kembaliOleh`]: null,
+        [`pinjam/${l.id}/kembaliOlehHp`]: null,
         [`aktif/${kAlat(l)}`]: l.id,
       });
     } catch { alert('Gagal membatalkan.'); }
@@ -420,6 +436,8 @@ function Dashboard({ user, rid, isSuper, myKey }) {
       sau.forEach((x) => {
         upd[`pinjam/${x.id}/status`] = 'kembali';
         upd[`pinjam/${x.id}/kembaliWaktu`] = serverTimestamp();
+        upd[`pinjam/${x.id}/kembaliOleh`] = penerima().kembaliOleh;
+        upd[`pinjam/${x.id}/kembaliOlehHp`] = penerima().kembaliOlehHp;
         upd[`aktif/${kAlat(x)}`] = null;
       });
       await update(ref(db, B), upd);
@@ -431,8 +449,8 @@ function Dashboard({ user, rid, isSuper, myKey }) {
   const cur = antrean[0];
 
   const csv = () => {
-    const rows = [['Receiver', 'Nama', 'WhatsApp/Email', 'Institusi', 'Status', 'Waktu pinjam', 'Waktu kembali', 'Nilai pelayanan', 'Nilai alat', 'Komentar']]
-      .concat([...loans].sort(natural).map((l) => [l.receiver, l.nama, l.hp, l.institusi, l.status, fmtTgl(l.waktu), fmtTgl(l.kembaliWaktu), nilai[l.id]?.pelayanan ?? '', nilai[l.id]?.alat ?? '', nilai[l.id]?.komentar ?? '']));
+    const rows = [['Receiver', 'Nama', 'WhatsApp/Email', 'Institusi', 'Status', 'Waktu pinjam', 'Waktu kembali', 'Diterima oleh', 'Nilai pelayanan', 'Nilai alat', 'Komentar']]
+      .concat([...loans].sort(natural).map((l) => [l.receiver, l.nama, l.hp, l.institusi, l.status, fmtTgl(l.waktu), fmtTgl(l.kembaliWaktu), l.kembaliOleh ?? '', nilai[l.id]?.pelayanan ?? '', nilai[l.id]?.alat ?? '', nilai[l.id]?.komentar ?? '']));
     const text = rows.map((r) => r.map((c) => `"${String(c ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv' }));
@@ -469,11 +487,11 @@ function Dashboard({ user, rid, isSuper, myKey }) {
       };
       autoTable(doc, {
         startY: 102,
-        head: [['No. Alat', 'Nama', 'WhatsApp / Email', 'Institusi', 'Status', 'Pinjam', 'Kembali', 'Pelayanan', 'Alat']],
+        head: [['No. Alat', 'Nama', 'WhatsApp / Email', 'Institusi', 'Status', 'Pinjam', 'Kembali', 'Diterima oleh', 'Pelayanan', 'Alat']],
         body: urut.map((l) => [
           b(l.receiver), b(l.nama), b(l.hp), b(l.institusi),
           l.status === 'kembali' ? 'Kembali' : 'Dipinjam',
-          fmtTgl(l.waktu), l.kembaliWaktu ? fmtTgl(l.kembaliWaktu) : '-',
+          fmtTgl(l.waktu), l.kembaliWaktu ? fmtTgl(l.kembaliWaktu) : '-', b(l.kembaliOleh) || '-',
           nilai[l.id]?.pelayanan ?? '-', nilai[l.id]?.alat ?? '-',
         ]),
         styles: { fontSize: 8, cellPadding: 3 },
@@ -532,6 +550,7 @@ function Dashboard({ user, rid, isSuper, myKey }) {
         <div>
           <h1>Usher · Interpreter</h1>
           <div className="muted">{cfg.acara || (rid ? rid : 'Usher')}</div>
+          {namaSaya && <div className="who">👤 Login sebagai <b>{namaSaya}</b></div>}
         </div>
         <button className="link" onClick={keluar}>Keluar</button>
       </div>
@@ -618,6 +637,7 @@ function Dashboard({ user, rid, isSuper, myKey }) {
                 {tab === 'aktif' && saudara(l).length > 1 && <span className="group">📦 {saudara(l).length} alat atas nama ini: No. {daftarNo(l)}</span>}
                 {l.catatanGanti && <span className="group">🔁 Ganti alat: {l.catatanGanti}</span>}
                 <span>{l.hp} · pinjam {fmtJam(l.waktu)}{l.kembaliWaktu ? ` · kembali ${fmtJam(l.kembaliWaktu)}` : ''}</span>
+                {l.status === 'kembali' && l.kembaliOleh && <span className="group">✅ Diterima oleh <b>{l.kembaliOleh}</b></span>}
                 {nilai[l.id] && <span>Nilai: pelayanan <span className="star-sm">{nilai[l.id].pelayanan}★</span> · alat <span className="star-sm">{nilai[l.id].alat}★</span></span>}
                 {l.reminderJumlah > 0 && <span className="muted">Diingatkan {l.reminderJumlah}× (terakhir {fmtJam(l.reminderTerakhir)})</span>}
               </div>

@@ -95,3 +95,4 @@ a.btn,a.link{text-decoration:none}
 
 .petugas{display:flex;flex-direction:column;gap:8px;background:#06101F;border:1px solid #1B2D4A;border-radius:12px;padding:12px}
 .petugas select{padding:11px;border-radius:10px;border:1px solid #2A4066;background:#0D1B30;color:#fff;font:inherit;font-size:14px}
+.who{font-size:13px;color:#93C5FD;margin-top:4px}
