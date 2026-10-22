@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, sign
 import { ref, onValue, update, push, remove, get, set, serverTimestamp } from 'firebase/database';
 import QRCode from 'qrcode';
 import { auth, db } from '../firebase.js';
-import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK } from './util.js';
+import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK, basePath, slug, statusRuang, jadwalText } from './util.js';
 
 const natural = (a, b) => String(a.receiver).localeCompare(String(b.receiver), undefined, { numeric: true });
 
@@ -88,7 +88,9 @@ function Login({ onOk }) {
   );
 }
 
-function Pengaturan({ cfg, total, onCsv, onPdf, onReset }) {
+function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid }) {
+  const B = basePath(rid);
+  const PX = rid ? 'rooms/' + rid + '/' : '';
   const [acara, setAcara] = useState(cfg.acara || '');
   const [batas, setBatas] = useState(cfg.batasJam || '');
   const [pesan, setPesan] = useState(cfg.pesan || DEFAULT_PESAN);
@@ -102,19 +104,19 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset }) {
   const [resetBuka, setResetBuka] = useState(false);
   const [ketik, setKetik] = useState('');
   const [resetBusy, setResetBusy] = useState(false);
-  const link = location.origin + location.pathname.replace(/[^/]*$/, '') + '#/';
+  const link = location.origin + location.pathname.replace(/[^/]*$/, '') + '#/' + (rid ? 'r/' + rid : '');
   const bantuan = Object.entries(cfg.bantuan || {});
 
   useEffect(() => { QRCode.toDataURL(link, { width: 480, margin: 2 }).then(setQr).catch(() => {}); }, [link]);
 
   const simpan = async () => {
-    await update(ref(db, 'interpreter/config'), { acara: acara.trim(), batasJam: batas, pesan });
+    await update(ref(db, B + '/config'), { acara: acara.trim(), batasJam: batas, pesan });
     alert('Tersimpan.');
   };
   const simpanTeknisi = async () => {
     if (!/^62[0-9]{8,13}$/.test(waNum(tHp))) return alert('Nomor WhatsApp teknisi tidak valid. Contoh: 08123456789');
     try {
-      await update(ref(db, 'interpreter/config'), { teknisi: { nama: tNama.trim(), hp: tHp.trim() } });
+      await update(ref(db, B + '/config'), { teknisi: { nama: tNama.trim(), hp: tHp.trim() } });
       alert('Nomor teknisi tersimpan. Tombol bantuan di halaman tamu sekarang langsung ke WhatsApp teknisi ini.');
     } catch { alert('Gagal menyimpan nomor teknisi.'); }
   };
@@ -126,7 +128,7 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset }) {
     const data = {};
     baris.forEach((c) => { data['c' + Number(c.ch)] = { ch: Number(c.ch), bahasa: c.bahasa.slice(0, 40) }; });
     try {
-      await set(ref(db, 'interpreter/config/channels'), baris.length ? data : null);
+      await set(ref(db, B + '/config/channels'), baris.length ? data : null);
       alert('Daftar channel tersimpan. Langsung tampil di panduan halaman tamu.');
     } catch { alert('Gagal menyimpan daftar channel.'); }
   };
@@ -134,10 +136,10 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset }) {
     if (!nama.trim() || !hp.trim()) return;
     const key = waNum(hp);
     if (!/^62[0-9]{8,13}$/.test(key)) return alert('Nomor HP tidak valid.');
-    const id = push(ref(db, 'interpreter/config/bantuan')).key;
+    const id = push(ref(db, B + '/config/bantuan')).key;
     try {
       await update(ref(db, 'interpreter'), {
-        ['config/bantuan/' + id]: { nama: nama.trim(), hp: hp.trim() },
+        [PX + 'config/bantuan/' + id]: { nama: nama.trim(), hp: hp.trim() },
         ['usherDaftar/' + key]: nama.trim(),
       });
       setNama(''); setHp('');
@@ -175,7 +177,7 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset }) {
         {bantuan.map(([id, u]) => (
           <div className="row" key={id}>
             <span>{u.nama} · {u.hp}</span>
-            <button className="link danger" onClick={() => update(ref(db, 'interpreter'), { ['config/bantuan/' + id]: null, ['usherDaftar/' + waNum(u.hp)]: null }).catch(() => alert('Gagal menghapus.'))}>Hapus</button>
+            <button className="link danger" onClick={() => update(ref(db, 'interpreter'), { [PX + 'config/bantuan/' + id]: null, ['usherDaftar/' + waNum(u.hp)]: null }).catch(() => alert('Gagal menghapus.'))}>Hapus</button>
           </div>
         ))}
         <input placeholder="Nama usher" value={nama} onChange={(e) => setNama(e.target.value)} />
@@ -265,7 +267,9 @@ function Penilaian({ nilai, loans }) {
   );
 }
 
-function Dashboard({ user }) {
+function Dashboard({ user, rid, isSuper }) {
+  const B = basePath(rid);
+  const [rooms, setRooms] = useState([]);
   const [loans, setLoans] = useState([]);
   const [nilai, setNilai] = useState({});
   const [cfg, setCfg] = useState({});
@@ -275,13 +279,15 @@ function Dashboard({ user }) {
   const [now, setNow] = useState(Date.now());
 
   useEffect(() => {
-    const a = onValue(ref(db, 'interpreter/pinjam'), (s) =>
+    const a = onValue(ref(db, B + '/pinjam'), (s) =>
       setLoans(Object.entries(s.val() || {}).map(([id, v]) => ({ id, ...v }))), () => {});
-    const b = onValue(ref(db, 'interpreter/config'), (s) => setCfg(s.val() || {}), () => {});
-    const c = onValue(ref(db, 'interpreter/nilai'), (s) => setNilai(s.val() || {}), () => {});
+    const b = onValue(ref(db, B + '/config'), (s) => setCfg(s.val() || {}), () => {});
+    const c = onValue(ref(db, B + '/nilai'), (s) => setNilai(s.val() || {}), () => {});
+    const d = onValue(ref(db, 'interpreter/ruangan'), (s) =>
+      setRooms(Object.entries(s.val() || {}).map(([id, v]) => ({ id, ...v })).sort((x, y) => (x.tanggal + x.mulai).localeCompare(y.tanggal + y.mulai))), () => {});
     const t = setInterval(() => setNow(Date.now()), 30000);
-    return () => { a(); b(); c(); clearInterval(t); };
-  }, []);
+    return () => { a(); b(); c(); d(); clearInterval(t); };
+  }, [B]);
 
   const aktif = useMemo(() => loans.filter((l) => l.status === 'dipinjam'), [loans]);
   const kembali = useMemo(() => loans.filter((l) => l.status === 'kembali'), [loans]);
@@ -312,7 +318,7 @@ function Dashboard({ user }) {
   const sudahKembali = async (l) => {
     if (!confirm(`Receiver ${l.receiver} (${l.nama}) sudah kembali?`)) return;
     try {
-      await update(ref(db, 'interpreter'), {
+      await update(ref(db, B), {
         [`pinjam/${l.id}/status`]: 'kembali',
         [`pinjam/${l.id}/kembaliWaktu`]: serverTimestamp(),
         [`aktif/${kAlat(l)}`]: null,
@@ -322,10 +328,10 @@ function Dashboard({ user }) {
   };
 
   const batalKembali = async (l) => {
-    const s = await get(ref(db, `interpreter/aktif/${kAlat(l)}`));
+    const s = await get(ref(db, `${B}/aktif/${kAlat(l)}`));
     if (s.exists()) return alert(`Nomor ${l.receiver} sekarang sedang dipinjam orang lain.`);
     try {
-      await update(ref(db, 'interpreter'), {
+      await update(ref(db, B), {
         [`pinjam/${l.id}/status`]: 'dipinjam',
         [`pinjam/${l.id}/kembaliWaktu`]: null,
         [`aktif/${kAlat(l)}`]: l.id,
@@ -355,7 +361,7 @@ function Dashboard({ user }) {
       upd[`pinjam/${x.id}/reminderTerakhir`] = serverTimestamp();
       upd[`pinjam/${x.id}/reminderJumlah`] = (x.reminderJumlah || 0) + 1;
     });
-    update(ref(db, 'interpreter'), upd).catch(() => {});
+    update(ref(db, B), upd).catch(() => {});
     const ids = sau.map((x) => x.id);
     setQueue((x) => x.filter((id) => !ids.includes(id)));
   };
@@ -370,7 +376,7 @@ function Dashboard({ user }) {
     if (pakai) { alert(`No. ${baru} sedang dipinjam oleh ${pakai.nama}. Pilih nomor lain, atau tandai alat itu kembali dulu.`); return false; }
     if (!confirm(`Tukar alat ${l.nama}:\nNo. ${l.receiver} → No. ${baru}${alasan ? `\nAlasan: ${alasan}` : ''}\n\n(No. ${l.receiver} akan bebas dipinjam lagi — pastikan alat yang error dipisahkan.)`)) return false;
     try {
-      await update(ref(db, 'interpreter'), {
+      await update(ref(db, B), {
         [`pinjam/${l.id}/receiver`]: baru,
         [`pinjam/${l.id}/kunci`]: rcvKey(baru),
         [`pinjam/${l.id}/catatanGanti`]: ((l.catatanGanti ? l.catatanGanti + '; ' : '') + `${l.receiver}→${baru}${alasan ? ' [' + alasan + ']' : ''} (${fmtJam(Date.now())})`).slice(-200),
@@ -406,7 +412,7 @@ function Dashboard({ user }) {
         upd[`pinjam/${x.id}/kembaliWaktu`] = serverTimestamp();
         upd[`aktif/${kAlat(x)}`] = null;
       });
-      await update(ref(db, 'interpreter'), upd);
+      await update(ref(db, B), upd);
       setQ('');
     } catch { alert('Gagal menyimpan. Cek internet lalu coba lagi.'); }
   };
@@ -484,7 +490,7 @@ function Dashboard({ user }) {
 
   const resetSemua = async () => {
     try {
-      await update(ref(db, 'interpreter'), {
+      await update(ref(db, B), {
         pinjam: null, aktif: null, nilai: null,
         'config/resetAt': serverTimestamp(),
       });
@@ -506,10 +512,20 @@ function Dashboard({ user }) {
       <div className="head">
         <div>
           <h1>Usher · Interpreter</h1>
-          <div className="muted">{cfg.acara || 'Usher'}</div>
+          <div className="muted">{cfg.acara || (rid ? rid : 'Usher')}</div>
         </div>
         <button className="link" onClick={keluar}>Keluar</button>
       </div>
+
+      {(rooms.length > 0 || isSuper) && (
+        <div className="roombar">
+          <select value={rid} onChange={(e) => { location.hash = e.target.value ? '#/usher/' + e.target.value : '#/usher'; }}>
+            <option value="">Acara utama (default)</option>
+            {rooms.map((r) => <option key={r.id} value={r.id}>{r.nama} · {r.tanggal} {r.mulai}</option>)}
+          </select>
+          {isSuper && <a className="link" href="#/admin">⚙️ Kelola ruangan</a>}
+        </div>
+      )}
 
       <div className="stats">
         <div><b>{aktif.length}</b><span>Belum kembali</span></div>
@@ -569,7 +585,7 @@ function Dashboard({ user }) {
         ))}
       </div>
 
-      {tab === 'atur' ? <Pengaturan cfg={cfg} total={loans.length} onCsv={csv} onPdf={pdf} onReset={resetSemua} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
+      {tab === 'atur' ? <Pengaturan cfg={cfg} total={loans.length} onCsv={csv} onPdf={pdf} onReset={resetSemua} rid={rid} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
         <>
           <input className="search" placeholder="🔍 Cari nomor receiver / nama / HP" value={q}
             onChange={(e) => setQ(e.target.value)} inputMode="search" />
@@ -608,10 +624,135 @@ function Dashboard({ user }) {
   );
 }
 
-export default function Usher() {
+function Qr({ text }) {
+  const [src, setSrc] = useState('');
+  useEffect(() => { QRCode.toDataURL(text, { width: 480, margin: 2 }).then(setSrc).catch(() => {}); }, [text]);
+  return src ? <img className="qr" src={src} alt="QR" /> : null;
+}
+
+const ST = { akan: ['Akan datang', ''], berlangsung: ['Berlangsung', ' ok'], selesai: ['Selesai', ''] };
+const hariIni = () => { const d = new Date(); return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`; };
+
+// Panel Super Admin: buat / ubah / hapus ruangan + jadwal
+function Admin() {
+  const [rooms, setRooms] = useState([]);
+  const [now, setNow] = useState(Date.now());
+  const [f, setF] = useState({ nama: '', tanggal: hariIni(), mulai: '', selesai: '' });
+  const [edit, setEdit] = useState('');     // id ruangan yang sedang diubah ('' = buat baru)
+  const [qrId, setQrId] = useState('');
+  const [busy, setBusy] = useState(false);
+  const base = location.origin + location.pathname.replace(/[^/]*$/, '');
+  const linkTamu = (id) => base + '#/r/' + id;
+
+  useEffect(() => {
+    const a = onValue(ref(db, 'interpreter/ruangan'), (sn) =>
+      setRooms(Object.entries(sn.val() || {}).map(([id, v]) => ({ id, ...v })).sort((x, y) => (x.tanggal + x.mulai).localeCompare(y.tanggal + y.mulai))), () => {});
+    const t = setInterval(() => setNow(Date.now()), 30000);
+    return () => { a(); clearInterval(t); };
+  }, []);
+
+  const set_ = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const reset = () => { setEdit(''); setF({ nama: '', tanggal: hariIni(), mulai: '', selesai: '' }); };
+
+  const simpan = async () => {
+    const nama = f.nama.trim();
+    if (!nama || !f.tanggal || !f.mulai || !f.selesai) return alert('Nama ruangan, tanggal, jam mulai, dan jam selesai wajib diisi.');
+    if (f.selesai <= f.mulai) return alert('Jam selesai harus setelah jam mulai.');
+    let id = edit;
+    if (!id) {
+      const dasar = slug(nama) || 'ruangan';
+      id = dasar; let n = 2;
+      while (rooms.some((r) => r.id === id)) id = (dasar.slice(0, 26) + '-' + n++);
+    }
+    const data = { nama, tanggal: f.tanggal, mulai: f.mulai, selesai: f.selesai };
+    const upd = {
+      ['ruangan/' + id]: data,
+      ['rooms/' + id + '/config/acara']: nama,
+      ['rooms/' + id + '/config/batasJam']: f.selesai,
+      ['rooms/' + id + '/config/jadwal']: jadwalText(data),
+    };
+    setBusy(true);
+    try {
+      if (!edit) {
+        // ruangan baru: salin nomor teknisi, daftar Usher, dan teks pengingat dari acara utama
+        const c = (await get(ref(db, 'interpreter/config'))).val() || {};
+        ['teknisi', 'bantuan', 'pesan'].forEach((k) => { if (c[k] != null) upd['rooms/' + id + '/config/' + k] = c[k]; });
+      }
+      await update(ref(db, 'interpreter'), upd);
+      alert(edit ? 'Jadwal ruangan diperbarui.' : 'Ruangan dibuat. Isi daftar channel di dashboard ruangan (tab Pengaturan), lalu cetak QR-nya.');
+      reset();
+    } catch (e) { alert('Gagal menyimpan (' + (e.code || '?') + '). Pastikan akun ini terdaftar sebagai Super Admin dan Rules terbaru sudah dipasang.'); }
+    setBusy(false);
+  };
+
+  const hapus = async (r) => {
+    const ketik = prompt(`HAPUS ruangan "${r.nama}" beserta seluruh data peminjaman & penilaiannya?\nTidak bisa dibatalkan. Ketik nama ruangan untuk melanjutkan:`);
+    if (ketik == null) return;
+    if (ketik.trim() !== r.nama) return alert('Nama tidak cocok. Tidak ada yang dihapus.');
+    try { await update(ref(db, 'interpreter'), { ['ruangan/' + r.id]: null, ['rooms/' + r.id]: null }); }
+    catch { alert('Gagal menghapus.'); }
+  };
+  const salin = (t) => { (navigator.clipboard?.writeText(t) || Promise.reject()).then(() => alert('Link disalin.')).catch(() => prompt('Salin link ini:', t)); };
+
+  return (
+    <div className="wrap wide">
+      <div className="head">
+        <div><h1>Super Admin · Ruangan & Jadwal</h1><div className="muted">Satu web, banyak ruangan. Data tiap ruangan terpisah.</div></div>
+        <a className="link" href="#/usher">← Dashboard</a>
+      </div>
+
+      <div className="card">
+        <h3>{edit ? 'Ubah jadwal ruangan' : '＋ Ruangan / acara baru'}</h3>
+        <label>Nama ruangan / acara<input value={f.nama} onChange={set_('nama')} maxLength={60} placeholder="mis. Ruang B · Seminar Siang" disabled={!!edit} /></label>
+        <label>Tanggal<input type="date" value={f.tanggal} onChange={set_('tanggal')} /></label>
+        <div className="row2">
+          <label>Mulai<input type="time" value={f.mulai} onChange={set_('mulai')} /></label>
+          <label>Selesai (batas pengembalian)<input type="time" value={f.selesai} onChange={set_('selesai')} /></label>
+        </div>
+        {!edit && <p className="muted">Nomor teknisi, daftar Usher, dan teks pengingat disalin otomatis dari acara utama. Daftar channel diisi per ruangan.</p>}
+        <div className="actions">
+          <button className="btn primary" disabled={busy} onClick={simpan}>{edit ? 'Simpan perubahan' : 'Buat ruangan'}</button>
+          {edit && <button className="btn" onClick={reset}>Batal</button>}
+        </div>
+      </div>
+
+      <div className="card">
+        <h3>Acara utama (default)</h3>
+        <p className="muted">Alamat lama <b>#/</b> dan <b>#/usher</b>. Data tetap seperti semula.</p>
+        <a className="btn" href="#/usher">Buka dashboard acara utama</a>
+      </div>
+
+      {rooms.length === 0 && <p className="muted center">Belum ada ruangan tambahan.</p>}
+      {rooms.map((r) => {
+        const [lbl, cls] = ST[statusRuang(r, now)];
+        return (
+          <div className="card" key={r.id}>
+            <div className="row"><b>{r.nama}</b><span className={'badge' + cls}>{lbl}</span></div>
+            <span className="muted">{jadwalText(r)}</span>
+            <span className="muted fine">Link tamu: {linkTamu(r.id)}</span>
+            <div className="actions">
+              <a className="btn primary" href={'#/usher/' + r.id}>Dashboard</a>
+              <button className="btn" onClick={() => salin(linkTamu(r.id))}>Salin link</button>
+              <button className="btn" onClick={() => setQrId(qrId === r.id ? '' : r.id)}>QR</button>
+              <button className="btn" onClick={() => { setEdit(r.id); setF({ nama: r.nama, tanggal: r.tanggal, mulai: r.mulai, selesai: r.selesai }); scrollTo(0, 0); }}>Ubah jadwal</button>
+              <button className="link danger" onClick={() => hapus(r)}>Hapus</button>
+            </div>
+            {qrId === r.id && <div className="center"><Qr text={linkTamu(r.id)} /><p className="muted">Cetak QR ini untuk tamu {r.nama}.</p></div>}
+          </div>
+        );
+      })}
+    </div>
+  );
+}
+
+export default function Usher({ hash = '#/usher' }) {
   const [user, setUser] = useState(undefined);
   const [ok, setOk] = useState(null);
   const [ver, setVer] = useState(0);
+  const [isSuper, setIsSuper] = useState(false);
+  const m = hash.match(/^#\/usher\/([a-z0-9-]{1,30})/);
+  const rid = m ? m[1] : '';                 // kosong = acara utama
+  const modeAdmin = hash.startsWith('#/admin');
 
   useEffect(() => onAuthStateChanged(auth, (u) => setUser(u || null)), []);
   useEffect(() => {
@@ -623,8 +764,30 @@ export default function Usher() {
     return () => { batal = true; };
   }, [user, ver]);
 
+  useEffect(() => {
+    if (!user || !ok) { setIsSuper(false); return; }
+    let batal = false;
+    (async () => {
+      try {
+        let sup = (await get(ref(db, 'interpreter/superadmin/' + user.uid))).exists();
+        if (!sup) {
+          const key = (await get(ref(db, 'interpreter/usher/' + user.uid))).val();
+          if (typeof key === 'string') sup = (await get(ref(db, 'interpreter/superDaftar/' + key))).exists();
+        }
+        if (!batal) setIsSuper(sup);
+      } catch { if (!batal) setIsSuper(false); }
+    })();
+    return () => { batal = true; };
+  }, [user, ok]);
+
   if (user === undefined) return <div className="wrap"><p className="muted center">Memuat…</p></div>;
   if (!user || ok === false) return <Login onOk={() => setVer((v) => v + 1)} />;
   if (ok === null) return <div className="wrap"><p className="muted center">Memeriksa akses…</p></div>;
-  return <Dashboard user={user} />;
+  if (modeAdmin) {
+    return isSuper ? <Admin /> : (
+      <div className="wrap"><div className="card center"><div className="big">🔒</div>
+        <p>Halaman ini hanya untuk Super Admin.</p><a className="btn" href="#/usher">← Ke dashboard</a></div></div>
+    );
+  }
+  return <Dashboard key={rid || '_'} user={user} rid={rid} isSuper={isSuper} />;
 }

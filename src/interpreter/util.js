@@ -27,3 +27,15 @@ export const contactLink = (c, text = '', subject = '') =>
 export const rcvNorm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 8);
 export const rcvKey = (s) => rcvNorm(s).replace(/^([A-Z]*-?)0+(?=\d)/, '$1');
 export const RCV_OK = /^[A-Z0-9-]{1,8}$/;
+
+// Jalur data: acara utama (lama) tetap di 'interpreter'; ruangan baru di 'interpreter/rooms/<id>'
+export const basePath = (rid) => (rid ? 'interpreter/rooms/' + rid : 'interpreter');
+export const RID_OK = /^[a-z0-9-]{1,30}$/;
+export const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
+// jadwal ruangan: tanggal 'YYYY-MM-DD', jam 'HH:MM' (waktu setempat)
+const waktu = (tgl, jam) => { const [y, m, d] = String(tgl).split('-').map(Number); const [h, mi] = String(jam).split(':').map(Number); return new Date(y, m - 1, d, h, mi).getTime(); };
+export const statusRuang = (r, now = Date.now()) => (now < waktu(r.tanggal, r.mulai) ? 'akan' : now > waktu(r.tanggal, r.selesai) ? 'selesai' : 'berlangsung');
+export const jadwalText = (r) => {
+  const [y, m, d] = String(r.tanggal).split('-').map(Number);
+  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + r.mulai + '–' + r.selesai;
+};

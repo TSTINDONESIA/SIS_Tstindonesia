@@ -66,6 +66,7 @@ export const T = {
       'Jika indikator baterai berkedip, hubungi petugas untuk ganti alat.',
     ],
     guideClose: 'Tutup',
+    roomNone: 'Ruangan tidak ditemukan. Periksa kembali QR/link dari petugas.',
   },
   en: {
     brandSub: 'Interpreter Service',
@@ -133,6 +134,7 @@ export const T = {
       'If the battery indicator blinks, ask our staff to replace the device.',
     ],
     guideClose: 'Close',
+    roomNone: 'Room not found. Please check the QR/link from our staff.',
   },
 };
 

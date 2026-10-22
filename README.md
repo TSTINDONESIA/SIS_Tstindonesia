@@ -28,3 +28,21 @@ Lokal: `npm install` lalu `npm run dev`. Kamera/QR tamu perlu HTTPS (Pages sudah
 - **Penilaian singkat** (bintang pelayanan + bintang alat + komentar opsional) muncul di halaman tamu setelah Usher menekan *Sudah kembali*. Hasil + rata-rata ada di tab **Penilaian** dan ikut diunduh di CSV.
 
 **PENTING setelah update:** tempel ulang `database.rules.json` ke Realtime Database -> Rules -> Publish (ada aturan baru untuk `uid` peminjam dan `nilai`). Tanpa ini pendaftaran tamu akan ditolak.
+
+## Banyak ruangan + Super Admin (v1.3)
+Satu project Firebase, banyak ruangan/acara. **Acara utama lama tidak berubah**: alamat `#/` (tamu) dan `#/usher` tetap memakai data `interpreter/*`. Ruangan baru memakai `interpreter/rooms/<id>/*` (data, channel, teknisi, penilaian terpisah).
+
+**Alamat**
+- Tamu ruangan: `#/r/<id>`  (QR-nya ada di panel Super Admin)
+- Dashboard Usher ruangan: `#/usher/<id>` (ada pilihan ruangan di bagian atas dashboard)
+- Panel Super Admin: `#/admin` (buat/ubah jadwal/hapus ruangan, salin link, QR)
+
+**Pasang (sekali)**
+1. Realtime Database -> Rules -> tempel `database.rules.json` terbaru -> Publish. (Bagian aturan lama identik dengan sebelumnya; yang baru hanya menambah `rooms`, `ruangan`, `superadmin`, `superDaftar`.)
+2. Jadikan seseorang Super Admin, langsung di Realtime Database -> Data (tidak bisa dari web):
+   - `interpreter/usherDaftar/628123456789` = `Nama` (kalau belum ada), dan
+   - `interpreter/superDaftar/628123456789` = `true`
+   (atau untuk akun email: `interpreter/superadmin/<UID>` = `true` dan `interpreter/usher/<UID>` = `true`).
+3. Login di `#/usher` dengan nama + nomor itu -> muncul tombol **⚙️ Kelola ruangan**.
+
+**Alur tiap acara**: Super Admin buat ruangan (nama, tanggal, jam mulai/selesai) -> buka dashboard ruangan -> Pengaturan -> isi **Channel bahasa** -> cetak QR dari panel Super Admin. Nomor teknisi, daftar Usher, dan teks pengingat disalin otomatis dari acara utama saat ruangan dibuat.

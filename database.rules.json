@@ -105,6 +105,136 @@
             ".validate": false
           }
         }
+      },
+      "rooms": {
+        ".read": false,
+        ".write": false,
+        "$rid": {
+          "config": {
+            ".read": "auth!=null",
+            ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()"
+          },
+          "pinjam": {
+            ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+            ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+            "$id": {
+              ".read": "auth!=null&&data.child('uid').val()===auth.uid",
+              ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.child('uid').val()===auth.uid&&newData.parent().parent().child('aktif').child(newData.child('kunci').val()).val()===$id)",
+              ".validate": "newData.hasChildren(['nama','hp','institusi','receiver','waktu','status'])",
+              "nama": {
+                ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=80"
+              },
+              "hp": {
+                ".validate": "newData.isString()&&newData.val().length<=100&&(newData.val().matches(/^[0-9+ -]{6,20}$/)||newData.val().matches(/^[^@ ]+@[^@ ]+[.][^@ ]+$/))"
+              },
+              "institusi": {
+                ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=100"
+              },
+              "receiver": {
+                ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,8}$/)"
+              },
+              "waktu": {
+                ".validate": "newData.val()===now"
+              },
+              "status": {
+                ".validate": "newData.val()==='dipinjam'||newData.val()==='kembali'"
+              },
+              "kembaliWaktu": {
+                ".validate": "newData.isNumber()"
+              },
+              "reminderTerakhir": {
+                ".validate": "newData.isNumber()"
+              },
+              "reminderJumlah": {
+                ".validate": "newData.isNumber()"
+              },
+              "uid": {
+                ".validate": "newData.isString()&&newData.val().length<=64"
+              },
+              "catatanGanti": {
+                ".validate": "newData.isString()&&newData.val().length<=200"
+              },
+              "kunci": {
+                ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,8}$/)"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          "aktif": {
+            ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+            ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+            "$rcv": {
+              ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists())",
+              ".validate": "$rcv.matches(/^[A-Z0-9-]{1,8}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).exists()"
+            }
+          },
+          "nilai": {
+            ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+            ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+            "$id": {
+              ".read": "auth!=null&&data.child('uid').val()===auth.uid",
+              ".write": "auth!=null&&!data.exists()&&newData.child('uid').val()===auth.uid&&root.child('interpreter/rooms/'+$rid+'/pinjam/'+$id+'/uid').val()===auth.uid&&root.child('interpreter/rooms/'+$rid+'/pinjam/'+$id+'/status').val()==='kembali'",
+              ".validate": "newData.hasChildren(['pelayanan','alat','uid','waktu'])",
+              "pelayanan": {
+                ".validate": "newData.isNumber()&&newData.val()>=1&&newData.val()<=5&&newData.val()%1===0"
+              },
+              "alat": {
+                ".validate": "newData.isNumber()&&newData.val()>=1&&newData.val()<=5&&newData.val()%1===0"
+              },
+              "komentar": {
+                ".validate": "newData.isString()&&newData.val().length<=300"
+              },
+              "uid": {
+                ".validate": "newData.isString()&&newData.val().length<=64"
+              },
+              "waktu": {
+                ".validate": "newData.val()===now"
+              },
+              "$other": {
+                ".validate": false
+              }
+            }
+          },
+          ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+          ".validate": "$rid.matches(/^[a-z0-9-]{1,30}$/)"
+        }
+      },
+      "ruangan": {
+        ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+        "$rid": {
+          ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+          ".validate": "$rid.matches(/^[a-z0-9-]{1,30}$/)&&newData.hasChildren(['nama','tanggal','mulai','selesai'])",
+          "nama": {
+            ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=60"
+          },
+          "tanggal": {
+            ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
+          },
+          "mulai": {
+            ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{2}:[0-9]{2}$/)"
+          },
+          "selesai": {
+            ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{2}:[0-9]{2}$/)"
+          },
+          "$other": {
+            ".validate": false
+          }
+        }
+      },
+      "superadmin": {
+        "$uid": {
+          ".read": "auth!=null&&auth.uid===$uid",
+          ".write": false
+        }
+      },
+      "superDaftar": {
+        ".read": false,
+        "$key": {
+          ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+          ".write": false
+        }
       }
     }
   }

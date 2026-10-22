@@ -11,6 +11,9 @@ function Root() {
     addEventListener('hashchange', f);
     return () => removeEventListener('hashchange', f);
   }, []);
-  return h.startsWith('#/usher') ? <Usher /> : <Guest />;
+  if (h.startsWith('#/usher') || h.startsWith('#/admin')) return <Usher hash={h} />;
+  const m = h.match(/^#\/r\/([a-z0-9-]{1,30})/);
+  const rid = m ? m[1] : '';          // kosong = acara utama (alamat lama)
+  return <Guest key={rid || '_'} rid={rid} />;
 }
 createRoot(document.getElementById('root')).render(<Root />);

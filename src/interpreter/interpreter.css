@@ -86,3 +86,9 @@ input:focus,textarea:focus{outline:2px solid #3B82F6}
 .tips ul{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
 .chedit{display:flex;gap:8px;align-items:center}
 .chedit .chno{width:64px;flex:none;text-align:center;font-weight:800}
+
+/* ===== Ruangan & Super Admin ===== */
+.roombar{display:flex;align-items:center;gap:10px;flex-wrap:wrap;margin-bottom:12px}
+.roombar select{flex:1;min-width:200px;padding:11px;border-radius:10px;border:1px solid #2A4066;background:#0D1B30;color:#fff;font:inherit;font-size:14px;font-weight:600}
+.row2{display:grid;grid-template-columns:1fr 1fr;gap:10px}
+a.btn,a.link{text-decoration:none}

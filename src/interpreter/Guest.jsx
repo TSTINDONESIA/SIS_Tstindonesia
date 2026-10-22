@@ -2,19 +2,11 @@ import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { ref, onValue, push, update, set, serverTimestamp } from 'firebase/database';
 import { auth, db } from '../firebase.js';
-import { waLink, validContact, rcvNorm, rcvKey, RCV_OK } from './util.js';
+import { waLink, validContact, rcvNorm, rcvKey, RCV_OK, basePath } from './util.js';
 import { T, initLang, saveLang } from './i18n.js';
 
 const KEY = 'tst-interpreter-last';
 const logo = import.meta.env.BASE_URL + 'logo.png';
-
-// satu tamu boleh membawa beberapa alat -> disimpan sebagai daftar
-const loadLoans = () => {
-  try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); return !v ? [] : Array.isArray(v) ? v : [v]; } catch { return []; }
-};
-const saveLoans = (a) => {
-  try { if (a.length) localStorage.setItem(KEY, JSON.stringify(a)); else localStorage.removeItem(KEY); } catch { /* */ }
-};
 
 function Panduan({ t, channels, onClose }) {
   useEffect(() => {
@@ -90,7 +82,7 @@ function Stars({ value, onChange, labels }) {
   );
 }
 
-function Penilaian({ t, id }) {
+function Penilaian({ t, id, base }) {
   const [pel, setPel] = useState(0);
   const [alat, setAlat] = useState(0);
   const [kom, setKom] = useState('');
@@ -105,7 +97,7 @@ function Penilaian({ t, id }) {
     try {
       const d = { pelayanan: pel, alat, uid: auth.currentUser.uid, waktu: serverTimestamp() };
       if (kom.trim()) d.komentar = kom.trim().slice(0, 300);
-      await set(ref(db, 'interpreter/nilai/' + id), d);
+      await set(ref(db, base + '/nilai/' + id), d);
     } catch (e2) { setErr(t.rateErr(e2.code || '?')); }
     setBusy(false);
   };
@@ -125,11 +117,21 @@ function Penilaian({ t, id }) {
   );
 }
 
-export default function Guest() {
+export default function Guest({ rid = '' }) {
+  const B = basePath(rid);
+  const KEYR = rid ? KEY + ':' + rid : KEY;   // catatan di perangkat tamu dipisah per ruangan
+  // satu tamu boleh membawa beberapa alat -> disimpan sebagai daftar
+  const loadLoans = () => {
+    try { const v = JSON.parse(localStorage.getItem(KEYR) || 'null'); return !v ? [] : Array.isArray(v) ? v : [v]; } catch { return []; }
+  };
+  const saveLoans = (a) => {
+    try { if (a.length) localStorage.setItem(KEYR, JSON.stringify(a)); else localStorage.removeItem(KEYR); } catch { /* */ }
+  };
   const [lang, setLang] = useState(initLang);
   const t = T[lang];
   const [ready, setReady] = useState(false);
   const [cfg, setCfg] = useState({});
+  const [cfgOk, setCfgOk] = useState(false);
   const [f, setF] = useState({ nama: '', hp: '', institusi: '', receiver: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
@@ -152,7 +154,7 @@ export default function Guest() {
 
   useEffect(() => {
     if (!ready) return;
-    return onValue(ref(db, 'interpreter/config'), (s) => setCfg(s.val() || {}), (e) => setErr(t.errCfg(e.code || '?')));
+    return onValue(ref(db, B + '/config'), (s) => { setCfg(s.val() || {}); setCfgOk(true); }, (e) => setErr(t.errCfg(e.code || '?')));
   }, [ready]); // eslint-disable-line
 
   // admin mereset data -> hapus catatan lama di perangkat tamu
@@ -167,9 +169,9 @@ export default function Guest() {
   useEffect(() => {
     if (!ready || !ids) { setSt({}); setRated(false); return; }
     const list = ids.split(',');
-    const offs = list.map((id) => onValue(ref(db, 'interpreter/pinjam/' + id),
+    const offs = list.map((id) => onValue(ref(db, B + '/pinjam/' + id),
       (s) => setSt((p) => ({ ...p, [id]: s.val() ? { status: s.val().status, receiver: s.val().receiver } : null })), () => {}));
-    offs.push(onValue(ref(db, 'interpreter/nilai/' + list[0]), (s) => setRated(s.exists()), () => {}));
+    offs.push(onValue(ref(db, B + '/nilai/' + list[0]), (s) => setRated(s.exists()), () => {}));
     return () => offs.forEach((o) => o());
   }, [ready, ids]);
 
@@ -197,10 +199,10 @@ export default function Guest() {
     if (!RCV_OK.test(d.receiver)) return setErr(t.errRcv);
     setBusy(true);
     try {
-      const id = push(ref(db, 'interpreter/pinjam')).key;
+      const id = push(ref(db, B + '/pinjam')).key;
       // satu penulisan atomik: catatan peminjam + kunci nomor receiver
       // (gagal otomatis bila nomor receiver itu masih tercatat dipinjam orang lain)
-      await update(ref(db, 'interpreter'), {
+      await update(ref(db, B), {
         ['pinjam/' + id]: { ...d, uid: auth.currentUser.uid, waktu: serverTimestamp(), status: 'dipinjam' },
         ['aktif/' + d.kunci]: id,
       });
@@ -235,12 +237,23 @@ export default function Guest() {
           <div className="brand-name">TST Indonesia</div>
           <div className="brand-sub">{t.brandSub}</div>
           {cfg.acara && <div className="brand-event">{cfg.acara}</div>}
+          {cfg.jadwal && <div className="brand-event">{cfg.jadwal}</div>}
         </div>
       </div>
       <button type="button" className="btn guidebtn" onClick={() => setGuide(true)}>📖 {t.guideBtn}</button>
       {guide && <Panduan t={t} channels={channels} onClose={() => setGuide(false)} />}
     </>
   );
+
+  // ====== ruangan tidak dikenal ======
+  if (rid && cfgOk && !cfg.acara) {
+    return (
+      <div className="wrap">
+        {head}
+        <div className="card center"><div className="big">🔎</div><p>{t.roomNone}</p></div>
+      </div>
+    );
+  }
 
   // ====== halaman sesudah terdaftar ======
   if (loans.length && !adding) {
@@ -251,7 +264,7 @@ export default function Guest() {
         {semuaKembali ? (
           rated ? (
             <div className="card center"><div className="big">🙏</div><h2>{t.rateThanks}</h2></div>
-          ) : <Penilaian t={t} id={loans[0].id} />
+          ) : <Penilaian t={t} id={loans[0].id} base={B} />
         ) : (
           <div className="card center">
             <div className="big">🙏</div>
