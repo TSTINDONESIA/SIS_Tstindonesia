@@ -88,7 +88,7 @@ function Login({ onOk }) {
   );
 }
 
-function Pengaturan({ cfg, total, onCsv, onReset }) {
+function Pengaturan({ cfg, total, onCsv, onPdf, onReset }) {
   const [acara, setAcara] = useState(cfg.acara || '');
   const [batas, setBatas] = useState(cfg.batasJam || '');
   const [pesan, setPesan] = useState(cfg.pesan || DEFAULT_PESAN);
@@ -173,8 +173,11 @@ function Pengaturan({ cfg, total, onCsv, onReset }) {
           <button className="btn" style={{ borderColor: '#B91C1C', color: '#FCA5A5' }} onClick={() => { setResetBuka(true); setKetik(''); }}>Reset data…</button>
         ) : (
           <>
-            <div className="err">Konfirmasi: {total} data akan dihapus permanen. Unduh CSV dulu bila masih dibutuhkan.</div>
-            <button className="btn" onClick={onCsv}>⬇ Unduh CSV dulu</button>
+            <div className="err">Konfirmasi: {total} data akan dihapus permanen. Unduh laporan PDF/CSV dulu bila masih dibutuhkan.</div>
+            <div className="actions">
+              <button className="btn" onClick={onPdf}>⬇ Unduh PDF dulu</button>
+              <button className="btn" onClick={onCsv}>⬇ Unduh CSV</button>
+            </div>
             <label>Ketik <b>RESET</b> untuk melanjutkan
               <input value={ketik} onChange={(e) => setKetik(e.target.value)} autoCapitalize="characters" autoCorrect="off" placeholder="RESET" />
             </label>
@@ -348,7 +351,13 @@ function Dashboard({ user }) {
         [`aktif/${rcvKey(baru)}`]: l.id,
       });
       return true;
-    } catch { alert('Gagal menukar alat. Pastikan Rules Firebase terbaru sudah di-Publish, lalu coba lagi.'); return false; }
+    } catch (e) {
+      const izin = String(e?.code || e?.message || '').toLowerCase().includes('permission');
+      alert(izin
+        ? 'DITOLAK oleh Firebase (permission denied).\nRules terbaru belum aktif. Buka Firebase Console > Realtime Database > Rules, tempel isi database.rules.json terbaru, klik Publish, lalu coba lagi.'
+        : `Gagal menukar alat (kode: ${e?.code || e?.message || '?'}). Cek internet lalu coba lagi.`);
+      return false;
+    }
   };
   const gantiAlat = (l) => jalankanGanti(l, prompt(`Tukar alat untuk ${l.nama}.\nNomor sekarang: ${l.receiver}\n\nMasukkan nomor alat PENGGANTI (mis. A001, B001, 01):`, '') || '');
 
@@ -385,6 +394,64 @@ function Dashboard({ user }) {
     a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv' }));
     a.download = 'interpreter-peminjaman.csv';
     a.click();
+  };
+
+  // laporan PDF (rekap peminjaman + penilaian) untuk diunduh
+  const pdf = async () => {
+    try {
+      const [{ jsPDF }, at] = await Promise.all([import('jspdf'), import('jspdf-autotable')]);
+      const autoTable = at.default;
+      const b = (v) => String(v ?? '').replace(/[^\x20-\x7E\u00A0-\u00FF]/g, '');
+      const doc = new jsPDF({ orientation: 'landscape', unit: 'pt', format: 'a4' });
+      const W = doc.internal.pageSize.getWidth();
+      const H = doc.internal.pageSize.getHeight();
+      const urut = [...loans].sort(natural);
+      const nv = Object.values(nilai);
+
+      doc.setFont('helvetica', 'bold'); doc.setFontSize(16);
+      doc.text('TST Indonesia - Laporan Peminjaman Receiver Interpreter', 40, 40);
+      doc.setFont('helvetica', 'normal'); doc.setFontSize(10);
+      if (cfg.acara) doc.text(b(cfg.acara), 40, 58);
+      doc.text(`Dicetak: ${fmtTgl(Date.now())}`, 40, 72);
+      doc.text(
+        `Total ${loans.length} alat  |  Masih dipinjam ${aktif.length}  |  Sudah kembali ${loans.length - aktif.length}  |  ` +
+        `Rata-rata penilaian: pelayanan ${rata(nv.map((x) => x.pelayanan))}/5, alat ${rata(nv.map((x) => x.alat))}/5 (${nv.length} penilaian)`,
+        40, 88);
+
+      const footer = () => {
+        doc.setFontSize(8);
+        doc.text(`Halaman ${doc.internal.getNumberOfPages()}`, W - 90, H - 18);
+        doc.text('TST Indonesia', 40, H - 18);
+      };
+      autoTable(doc, {
+        startY: 102,
+        head: [['No. Alat', 'Nama', 'WhatsApp / Email', 'Institusi', 'Status', 'Pinjam', 'Kembali', 'Pelayanan', 'Alat']],
+        body: urut.map((l) => [
+          b(l.receiver), b(l.nama), b(l.hp), b(l.institusi),
+          l.status === 'kembali' ? 'Kembali' : 'Dipinjam',
+          fmtTgl(l.waktu), l.kembaliWaktu ? fmtTgl(l.kembaliWaktu) : '-',
+          nilai[l.id]?.pelayanan ?? '-', nilai[l.id]?.alat ?? '-',
+        ]),
+        styles: { fontSize: 8, cellPadding: 3 },
+        headStyles: { fillColor: [37, 99, 235] },
+        didDrawPage: footer,
+      });
+
+      const kom = urut.filter((l) => nilai[l.id]?.komentar);
+      if (kom.length) {
+        autoTable(doc, {
+          startY: doc.lastAutoTable.finalY + 24,
+          head: [['No. Alat', 'Nama', 'Saran / komentar']],
+          body: kom.map((l) => [b(l.receiver), b(l.nama), b(nilai[l.id].komentar)]),
+          styles: { fontSize: 8, cellPadding: 3 },
+          headStyles: { fillColor: [217, 119, 6] },
+          didDrawPage: footer,
+        });
+      }
+      doc.save(`laporan-interpreter-${new Date().toISOString().slice(0, 10)}.pdf`);
+    } catch (e) {
+      alert('Gagal membuat PDF (' + (e?.message || '?') + '). Pastikan internet aktif lalu coba lagi.');
+    }
   };
 
   const resetSemua = async () => {
@@ -474,7 +541,7 @@ function Dashboard({ user }) {
         ))}
       </div>
 
-      {tab === 'atur' ? <Pengaturan cfg={cfg} total={loans.length} onCsv={csv} onReset={resetSemua} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
+      {tab === 'atur' ? <Pengaturan cfg={cfg} total={loans.length} onCsv={csv} onPdf={pdf} onReset={resetSemua} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
         <>
           <input className="search" placeholder="🔍 Cari nomor receiver / nama / HP" value={q}
             onChange={(e) => setQ(e.target.value)} inputMode="search" />
@@ -505,6 +572,7 @@ function Dashboard({ user }) {
               </div>
             </div>
           ))}
+          <button className="btn" onClick={pdf}>⬇ Unduh PDF</button>
           <button className="link" onClick={csv}>⬇ Unduh CSV</button>
         </>
       )}
