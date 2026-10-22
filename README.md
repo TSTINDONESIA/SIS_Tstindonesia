@@ -45,4 +45,6 @@ Satu project Firebase, banyak ruangan/acara. **Acara utama lama tidak berubah**:
    (atau untuk akun email: `interpreter/superadmin/<UID>` = `true` dan `interpreter/usher/<UID>` = `true`).
 3. Login di `#/usher` dengan nama + nomor itu -> muncul tombol **⚙️ Kelola ruangan**.
 
-**Alur tiap acara**: Super Admin buat ruangan (nama, tanggal, jam mulai/selesai) -> buka dashboard ruangan -> Pengaturan -> isi **Channel bahasa** -> cetak QR dari panel Super Admin. Nomor teknisi, daftar Usher, dan teks pengingat disalin otomatis dari acara utama saat ruangan dibuat.
+**Alur tiap acara**: Super Admin buat ruangan (nama, tanggal, jam mulai/selesai) -> buka dashboard ruangan -> Pengaturan -> isi **Channel bahasa** -> cetak QR dari panel Super Admin. Nomor teknisi dan teks pengingat disalin dari acara utama saat ruangan dibuat; daftar Usher dan channel mulai kosong. Menghapus Usher di dalam ruangan hanya melepas dari ruangan itu, tidak mencabut hak login.
+
+**Akses per ruangan (v1.4)**: dashboard ruangan hanya bisa dibuka oleh petugas yang ditugaskan Super Admin (panel `#/admin` -> tombol **👥 Petugas** pada ruangan) dan oleh Super Admin. Dijaga di Rules database, bukan hanya disembunyikan di menu. Acara utama (default) tetap bisa dibuka semua Usher seperti semula. Ruangan yang belum punya petugas hanya bisa dibuka Super Admin. Pasang Rules terbaru bersamaan dengan kode baru.

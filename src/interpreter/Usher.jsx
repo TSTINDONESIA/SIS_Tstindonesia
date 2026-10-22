@@ -88,7 +88,7 @@ function Login({ onOk }) {
   );
 }
 
-function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid }) {
+function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
   const B = basePath(rid);
   const PX = rid ? 'rooms/' + rid + '/' : '';
   const [acara, setAcara] = useState(cfg.acara || '');
@@ -171,19 +171,28 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid }) {
         <button className="btn primary" onClick={simpanCh}>Simpan channel</button>
       </div>
 
+      {rid ? (
+        <div className="card">
+          <h3>Petugas ruangan</h3>
+          <p className="muted">Petugas ruangan ini diatur oleh Super Admin.</p>
+          {bantuan.map(([id, u]) => <div className="row" key={id}><span>{u.nama} · {u.hp}</span></div>)}
+          {isSuper && <a className="btn" href="#/admin">Atur petugas di panel Super Admin</a>}
+        </div>
+      ) : (
       <div className="card">
         <h3>Daftar Usher</h3>
-        <p className="muted">Nama + nomor WA. Usher di daftar ini bisa login, dan nomornya tampil di halaman tamu sebagai tombol WhatsApp.</p>
+        <p className="muted">{rid ? 'Usher ruangan ini: nomornya tampil di halaman tamu ruangan ini. Menghapus di sini tidak mencabut hak login Usher.' : 'Nama + nomor WA. Usher di daftar ini bisa login, dan nomornya tampil di halaman tamu sebagai tombol WhatsApp.'}</p>
         {bantuan.map(([id, u]) => (
           <div className="row" key={id}>
             <span>{u.nama} · {u.hp}</span>
-            <button className="link danger" onClick={() => update(ref(db, 'interpreter'), { [PX + 'config/bantuan/' + id]: null, ['usherDaftar/' + waNum(u.hp)]: null }).catch(() => alert('Gagal menghapus.'))}>Hapus</button>
+            <button className="link danger" onClick={() => update(ref(db, 'interpreter'), rid ? { [PX + 'config/bantuan/' + id]: null } : { ['config/bantuan/' + id]: null, ['usherDaftar/' + waNum(u.hp)]: null }).catch(() => alert('Gagal menghapus.'))}>Hapus</button>
           </div>
         ))}
         <input placeholder="Nama usher" value={nama} onChange={(e) => setNama(e.target.value)} />
         <input placeholder="Nomor WhatsApp" type="tel" value={hp} onChange={(e) => setHp(e.target.value)} />
         <button className="btn" onClick={tambah}>+ Tambah</button>
       </div>
+      )}
 
       <div className="card">
         <h3>Acara & pengingat</h3>
@@ -267,9 +276,10 @@ function Penilaian({ nilai, loans }) {
   );
 }
 
-function Dashboard({ user, rid, isSuper }) {
+function Dashboard({ user, rid, isSuper, myKey }) {
   const B = basePath(rid);
   const [rooms, setRooms] = useState([]);
+  const [denied, setDenied] = useState(false);
   const [loans, setLoans] = useState([]);
   const [nilai, setNilai] = useState({});
   const [cfg, setCfg] = useState({});
@@ -280,7 +290,7 @@ function Dashboard({ user, rid, isSuper }) {
 
   useEffect(() => {
     const a = onValue(ref(db, B + '/pinjam'), (s) =>
-      setLoans(Object.entries(s.val() || {}).map(([id, v]) => ({ id, ...v }))), () => {});
+      setLoans(Object.entries(s.val() || {}).map(([id, v]) => ({ id, ...v }))), () => setDenied(true));
     const b = onValue(ref(db, B + '/config'), (s) => setCfg(s.val() || {}), () => {});
     const c = onValue(ref(db, B + '/nilai'), (s) => setNilai(s.val() || {}), () => {});
     const d = onValue(ref(db, 'interpreter/ruangan'), (s) =>
@@ -507,6 +517,15 @@ function Dashboard({ user, rid, isSuper }) {
     signOut(auth);
   };
 
+  const boleh = rooms.filter((r) => isSuper || (myKey && r.petugas && r.petugas[myKey]));
+  if (denied) {
+    return (
+      <div className="wrap"><div className="card center"><div className="big">🔒</div>
+        <p>Anda belum ditugaskan di ruangan ini. Hubungi Super Admin.</p>
+        <a className="btn" href="#/usher">← Acara utama</a></div></div>
+    );
+  }
+
   return (
     <div className="wrap wide">
       <div className="head">
@@ -517,11 +536,11 @@ function Dashboard({ user, rid, isSuper }) {
         <button className="link" onClick={keluar}>Keluar</button>
       </div>
 
-      {(rooms.length > 0 || isSuper) && (
+      {(boleh.length > 0 || isSuper) && (
         <div className="roombar">
           <select value={rid} onChange={(e) => { location.hash = e.target.value ? '#/usher/' + e.target.value : '#/usher'; }}>
             <option value="">Acara utama (default)</option>
-            {rooms.map((r) => <option key={r.id} value={r.id}>{r.nama} · {r.tanggal} {r.mulai}</option>)}
+            {boleh.map((r) => <option key={r.id} value={r.id}>{r.nama} · {r.tanggal} {r.mulai}</option>)}
           </select>
           {isSuper && <a className="link" href="#/admin">⚙️ Kelola ruangan</a>}
         </div>
@@ -557,7 +576,7 @@ function Dashboard({ user, rid, isSuper }) {
       {!cfg.teknisi?.hp && (
         <div className="warn">
           🛟 Nomor teknisi belum diisi — tombol bantuan di halaman tamu belum mengarah ke teknisi.
-          <button className="btn" onClick={() => setTab('atur')}>Isi nomor teknisi</button>
+          {isSuper ? <button className="btn" onClick={() => setTab('atur')}>Isi nomor teknisi</button> : <span>Hubungi Super Admin.</span>}
         </div>
       )}
 
@@ -580,12 +599,12 @@ function Dashboard({ user, rid, isSuper }) {
       )}
 
       <div className="tabs">
-        {[['aktif', 'Dipinjam'], ['kembali', 'Sudah kembali'], ['nilai', 'Penilaian'], ['atur', 'Pengaturan']].map(([k, t]) => (
+        {[['aktif', 'Dipinjam'], ['kembali', 'Sudah kembali'], ['nilai', 'Penilaian'], ...(isSuper ? [['atur', 'Pengaturan']] : [])].map(([k, t]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t}</button>
         ))}
       </div>
 
-      {tab === 'atur' ? <Pengaturan cfg={cfg} total={loans.length} onCsv={csv} onPdf={pdf} onReset={resetSemua} rid={rid} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
+      {tab === 'atur' && isSuper ? <Pengaturan cfg={cfg} total={loans.length} onCsv={csv} onPdf={pdf} onReset={resetSemua} rid={rid} isSuper={isSuper} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
         <>
           <input className="search" placeholder="🔍 Cari nomor receiver / nama / HP" value={q}
             onChange={(e) => setQ(e.target.value)} inputMode="search" />
@@ -641,14 +660,18 @@ function Admin() {
   const [edit, setEdit] = useState('');     // id ruangan yang sedang diubah ('' = buat baru)
   const [qrId, setQrId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [ptId, setPtId] = useState('');          // ruangan yang panel petugasnya terbuka
+  const [pt, setPt] = useState({ nama: '', hp: '' });
+  const [utama, setUtama] = useState([]);         // daftar Usher acara utama (untuk pilihan cepat)
   const base = location.origin + location.pathname.replace(/[^/]*$/, '');
   const linkTamu = (id) => base + '#/r/' + id;
 
   useEffect(() => {
     const a = onValue(ref(db, 'interpreter/ruangan'), (sn) =>
       setRooms(Object.entries(sn.val() || {}).map(([id, v]) => ({ id, ...v })).sort((x, y) => (x.tanggal + x.mulai).localeCompare(y.tanggal + y.mulai))), () => {});
+    const u = onValue(ref(db, 'interpreter/config/bantuan'), (sn) => setUtama(Object.values(sn.val() || {})), () => {});
     const t = setInterval(() => setNow(Date.now()), 30000);
-    return () => { a(); clearInterval(t); };
+    return () => { a(); u(); clearInterval(t); };
   }, []);
 
   const set_ = (k) => (e) => setF({ ...f, [k]: e.target.value });
@@ -666,7 +689,10 @@ function Admin() {
     }
     const data = { nama, tanggal: f.tanggal, mulai: f.mulai, selesai: f.selesai };
     const upd = {
-      ['ruangan/' + id]: data,
+      ['ruangan/' + id + '/nama']: nama,
+      ['ruangan/' + id + '/tanggal']: f.tanggal,
+      ['ruangan/' + id + '/mulai']: f.mulai,
+      ['ruangan/' + id + '/selesai']: f.selesai,
       ['rooms/' + id + '/config/acara']: nama,
       ['rooms/' + id + '/config/batasJam']: f.selesai,
       ['rooms/' + id + '/config/jadwal']: jadwalText(data),
@@ -674,15 +700,38 @@ function Admin() {
     setBusy(true);
     try {
       if (!edit) {
-        // ruangan baru: salin nomor teknisi, daftar Usher, dan teks pengingat dari acara utama
+        // ruangan baru: salin nomor teknisi dan teks pengingat dari acara utama (daftar Usher mulai kosong)
         const c = (await get(ref(db, 'interpreter/config'))).val() || {};
-        ['teknisi', 'bantuan', 'pesan'].forEach((k) => { if (c[k] != null) upd['rooms/' + id + '/config/' + k] = c[k]; });
+        ['teknisi', 'pesan'].forEach((k) => { if (c[k] != null) upd['rooms/' + id + '/config/' + k] = c[k]; });
       }
       await update(ref(db, 'interpreter'), upd);
       alert(edit ? 'Jadwal ruangan diperbarui.' : 'Ruangan dibuat. Isi daftar channel di dashboard ruangan (tab Pengaturan), lalu cetak QR-nya.');
       reset();
     } catch (e) { alert('Gagal menyimpan (' + (e.code || '?') + '). Pastikan akun ini terdaftar sebagai Super Admin dan Rules terbaru sudah dipasang.'); }
     setBusy(false);
+  };
+
+  const tambahPetugas = async (r) => {
+    const nama = pt.nama.trim();
+    const key = waNum(pt.hp);
+    if (!nama || !/^62[0-9]{8,13}$/.test(key)) return alert('Isi nama dan nomor WhatsApp yang valid, mis. 08123456789');
+    try {
+      // bila nomor sudah terdaftar login, pakai nama yang sudah ada (jangan menimpa nama login)
+      const ada = (await get(ref(db, 'interpreter/usherDaftar/' + key))).val();
+      const upd = {
+        ['ruangan/' + r.id + '/petugas/' + key]: ada || nama,
+        ['rooms/' + r.id + '/config/bantuan/' + key]: { nama: ada || nama, hp: pt.hp.trim() },
+      };
+      if (ada == null) upd['usherDaftar/' + key] = nama;
+      await update(ref(db, 'interpreter'), upd);
+      setPt({ nama: '', hp: '' });
+      if (ada && ada !== nama) alert(`Nomor ini sudah terdaftar atas nama "${ada}". Login memakai nama itu.`);
+    } catch { alert('Gagal menambah petugas.'); }
+  };
+  const lepasPetugas = (r, key) => {
+    if (!confirm('Lepas petugas ini dari ruangan? Hak login-nya tidak dicabut.')) return;
+    update(ref(db, 'interpreter'), { ['ruangan/' + r.id + '/petugas/' + key]: null, ['rooms/' + r.id + '/config/bantuan/' + key]: null })
+      .catch(() => alert('Gagal melepas petugas.'));
   };
 
   const hapus = async (r) => {
@@ -693,6 +742,14 @@ function Admin() {
     catch { alert('Gagal menghapus.'); }
   };
   const salin = (t) => { (navigator.clipboard?.writeText(t) || Promise.reject()).then(() => alert('Link disalin.')).catch(() => prompt('Salin link ini:', t)); };
+
+  // pilihan cepat: Usher acara utama + semua petugas yang pernah ditugaskan di ruangan mana pun (tanpa dobel)
+  const pilihan = (() => {
+    const m = new Map();
+    utama.forEach((u) => m.set(waNum(u.hp), u));
+    rooms.forEach((r) => Object.entries(r.petugas || {}).forEach(([k, nm]) => { if (!m.has(k)) m.set(k, { nama: nm, hp: k }); }));
+    return [...m.values()];
+  })();
 
   return (
     <div className="wrap wide">
@@ -709,7 +766,7 @@ function Admin() {
           <label>Mulai<input type="time" value={f.mulai} onChange={set_('mulai')} /></label>
           <label>Selesai (batas pengembalian)<input type="time" value={f.selesai} onChange={set_('selesai')} /></label>
         </div>
-        {!edit && <p className="muted">Nomor teknisi, daftar Usher, dan teks pengingat disalin otomatis dari acara utama. Daftar channel diisi per ruangan.</p>}
+        {!edit && <p className="muted">Nomor teknisi dan teks pengingat disalin dari acara utama. Daftar Usher dan daftar channel mulai kosong, isi di Pengaturan dashboard ruangan.</p>}
         <div className="actions">
           <button className="btn primary" disabled={busy} onClick={simpan}>{edit ? 'Simpan perubahan' : 'Buat ruangan'}</button>
           {edit && <button className="btn" onClick={reset}>Batal</button>}
@@ -733,10 +790,30 @@ function Admin() {
             <div className="actions">
               <a className="btn primary" href={'#/usher/' + r.id}>Dashboard</a>
               <button className="btn" onClick={() => salin(linkTamu(r.id))}>Salin link</button>
+              <button className="btn" onClick={() => setPtId(ptId === r.id ? '' : r.id)}>👥 Petugas ({Object.keys(r.petugas || {}).length})</button>
               <button className="btn" onClick={() => setQrId(qrId === r.id ? '' : r.id)}>QR</button>
               <button className="btn" onClick={() => { setEdit(r.id); setF({ nama: r.nama, tanggal: r.tanggal, mulai: r.mulai, selesai: r.selesai }); scrollTo(0, 0); }}>Ubah jadwal</button>
               <button className="link danger" onClick={() => hapus(r)}>Hapus</button>
             </div>
+            {ptId === r.id && (
+              <div className="petugas">
+                <b>Petugas ruangan ini</b>
+                <span className="muted fine">Hanya petugas di sini (dan Super Admin) yang bisa membuka dashboard ruangan ini.</span>
+                {Object.entries(r.petugas || {}).map(([key, nm]) => (
+                  <div className="row" key={key}><span>{nm} · {key}</span><button className="link danger" onClick={() => lepasPetugas(r, key)}>Lepas</button></div>
+                ))}
+                {!Object.keys(r.petugas || {}).length && <span className="muted">Belum ada petugas.</span>}
+                {pilihan.length > 0 && (
+                  <select value="" onChange={(e) => { const u = pilihan[e.target.value]; if (u) setPt({ nama: u.nama, hp: u.hp }); }}>
+                    <option value="">Pilih dari Usher acara utama…</option>
+                    {pilihan.map((u, i) => <option key={i} value={i}>{u.nama} · {u.hp}</option>)}
+                  </select>
+                )}
+                <input placeholder="Nama petugas" value={pt.nama} onChange={(e) => setPt({ ...pt, nama: e.target.value })} />
+                <input placeholder="Nomor WhatsApp" type="tel" value={pt.hp} onChange={(e) => setPt({ ...pt, hp: e.target.value })} />
+                <button className="btn primary" onClick={() => tambahPetugas(r)}>+ Tugaskan</button>
+              </div>
+            )}
             {qrId === r.id && <div className="center"><Qr text={linkTamu(r.id)} /><p className="muted">Cetak QR ini untuk tamu {r.nama}.</p></div>}
           </div>
         );
@@ -750,6 +827,7 @@ export default function Usher({ hash = '#/usher' }) {
   const [ok, setOk] = useState(null);
   const [ver, setVer] = useState(0);
   const [isSuper, setIsSuper] = useState(false);
+  const [myKey, setMyKey] = useState('');
   const m = hash.match(/^#\/usher\/([a-z0-9-]{1,30})/);
   const rid = m ? m[1] : '';                 // kosong = acara utama
   const modeAdmin = hash.startsWith('#/admin');
@@ -765,17 +843,15 @@ export default function Usher({ hash = '#/usher' }) {
   }, [user, ver]);
 
   useEffect(() => {
-    if (!user || !ok) { setIsSuper(false); return; }
+    if (!user || !ok) { setIsSuper(false); setMyKey(''); return; }
     let batal = false;
     (async () => {
       try {
         let sup = (await get(ref(db, 'interpreter/superadmin/' + user.uid))).exists();
-        if (!sup) {
-          const key = (await get(ref(db, 'interpreter/usher/' + user.uid))).val();
-          if (typeof key === 'string') sup = (await get(ref(db, 'interpreter/superDaftar/' + key))).exists();
-        }
-        if (!batal) setIsSuper(sup);
-      } catch { if (!batal) setIsSuper(false); }
+        const key = (await get(ref(db, 'interpreter/usher/' + user.uid))).val();
+        if (!sup && typeof key === 'string') sup = (await get(ref(db, 'interpreter/superDaftar/' + key))).exists();
+        if (!batal) { setIsSuper(sup); setMyKey(typeof key === 'string' ? key : ''); }
+      } catch { if (!batal) { setIsSuper(false); setMyKey(''); } }
     })();
     return () => { batal = true; };
   }, [user, ok]);
@@ -789,5 +865,5 @@ export default function Usher({ hash = '#/usher' }) {
         <p>Halaman ini hanya untuk Super Admin.</p><a className="btn" href="#/usher">← Ke dashboard</a></div></div>
     );
   }
-  return <Dashboard key={rid || '_'} user={user} rid={rid} isSuper={isSuper} />;
+  return <Dashboard key={rid || '_'} user={user} rid={rid} isSuper={isSuper} myKey={myKey} />;
 }

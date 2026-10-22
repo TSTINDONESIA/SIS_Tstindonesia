@@ -112,14 +112,14 @@
         "$rid": {
           "config": {
             ".read": "auth!=null",
-            ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()"
+            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())"
           },
           "pinjam": {
-            ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
-            ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+            ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
             "$id": {
               ".read": "auth!=null&&data.child('uid').val()===auth.uid",
-              ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.child('uid').val()===auth.uid&&newData.parent().parent().child('aktif').child(newData.child('kunci').val()).val()===$id)",
+              ".write": "(auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists()))||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.child('uid').val()===auth.uid&&newData.parent().parent().child('aktif').child(newData.child('kunci').val()).val()===$id)",
               ".validate": "newData.hasChildren(['nama','hp','institusi','receiver','waktu','status'])",
               "nama": {
                 ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=80"
@@ -163,16 +163,16 @@
             }
           },
           "aktif": {
-            ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
-            ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+            ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
             "$rcv": {
-              ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists())",
+              ".write": "(auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists()))||(auth!=null&&!data.exists())",
               ".validate": "$rcv.matches(/^[A-Z0-9-]{1,8}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).exists()"
             }
           },
           "nilai": {
-            ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
-            ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+            ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
             "$id": {
               ".read": "auth!=null&&data.child('uid').val()===auth.uid",
               ".write": "auth!=null&&!data.exists()&&newData.child('uid').val()===auth.uid&&root.child('interpreter/rooms/'+$rid+'/pinjam/'+$id+'/uid').val()===auth.uid&&root.child('interpreter/rooms/'+$rid+'/pinjam/'+$id+'/status').val()==='kembali'",
@@ -220,6 +220,11 @@
           },
           "$other": {
             ".validate": false
+          },
+          "petugas": {
+            "$k": {
+              ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=80"
+            }
           }
         }
       },
