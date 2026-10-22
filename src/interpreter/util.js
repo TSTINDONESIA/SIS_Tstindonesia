@@ -8,8 +8,17 @@ export function waNum(hp) {
 export const waLink = (hp, text = '') => `https://wa.me/${waNum(hp)}${text ? '?text=' + encodeURIComponent(text) : ''}`;
 export const fmtJam = (t) => (t ? new Date(t).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-');
 export const fmtTgl = (t) => (t ? new Date(t).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-');
-export const DEFAULT_PESAN =
+export const OLD_PESAN =
   'Halo {nama}, terima kasih telah hadir di {acara}. 🙏\nMohon mengembalikan receiver interpreter No. {no} ke meja Usher ya. Terima kasih!';
+export const DEFAULT_PESAN =
+  'Selamat {salam} Bapak/Ibu {nama},\n\nTerima kasih atas kehadiran Bapak/Ibu di {acara}. 🙏\n\nKami mohon kesediaan Bapak/Ibu untuk mengembalikan receiver interpreter No. {no} ke meja Usher. Atas perhatian dan kerja samanya, kami ucapkan terima kasih.\n\nHormat kami,\nTim Usher';
+// Salam sesuai jam kirim: pagi 04-10, siang 11-14, sore 15-17, malam selebihnya
+export const salamWaktu = (d = new Date()) => {
+  const h = d.getHours();
+  return h >= 4 && h < 11 ? 'pagi' : h >= 11 && h < 15 ? 'siang' : h >= 15 && h < 18 ? 'sore' : 'malam';
+};
+// pesan lama yang tersimpan di pengaturan otomatis diganti ke versi sopan
+export const pilihPesan = (tersimpan) => (!tersimpan || tersimpan === OLD_PESAN ? DEFAULT_PESAN : tersimpan);
 
 // Kontak tamu bisa nomor WhatsApp ATAU email
 export const isEmail = (s) => /^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(String(s || '').trim());

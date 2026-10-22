@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, sign
 import { ref, onValue, update, push, remove, get, set, serverTimestamp } from 'firebase/database';
 import QRCode from 'qrcode';
 import { auth, db } from '../firebase.js';
-import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK, basePath, slug, statusRuang, jadwalText } from './util.js';
+import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, pilihPesan, salamWaktu, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK, basePath, slug, statusRuang, jadwalText } from './util.js';
 
 const natural = (a, b) => String(a.receiver).localeCompare(String(b.receiver), undefined, { numeric: true });
 
@@ -93,7 +93,7 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
   const PX = rid ? 'rooms/' + rid + '/' : '';
   const [acara, setAcara] = useState(cfg.acara || '');
   const [batas, setBatas] = useState(cfg.batasJam || '');
-  const [pesan, setPesan] = useState(cfg.pesan || DEFAULT_PESAN);
+  const [pesan, setPesan] = useState(pilihPesan(cfg.pesan));
   const [nama, setNama] = useState('');
   const [hp, setHp] = useState('');
   const [tNama, setTNama] = useState(cfg.teknisi?.nama || '');
@@ -201,7 +201,7 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
         <label>Teks pengingat WA
           <textarea rows={4} value={pesan} onChange={(e) => setPesan(e.target.value)} />
         </label>
-        <p className="muted">Kode: {'{nama}'} {'{no}'} {'{acara}'}</p>
+        <p className="muted">Kode: {'{salam}'} {'{nama}'} {'{no}'} {'{acara}'}</p>
         <button className="btn primary" onClick={simpan}>Simpan</button>
       </div>
 
@@ -375,8 +375,8 @@ function Dashboard({ user, rid, isSuper, myKey }) {
   const saudara = (l) => [...(grup[kunci(l)] || [l])].sort(natural);
   const daftarNo = (l) => saudara(l).map((x) => x.receiver).join(', ');
 
-  const pesan = (l) => (cfg.pesan || DEFAULT_PESAN)
-    .replaceAll('{nama}', l.nama).replaceAll('{no}', daftarNo(l)).replaceAll('{acara}', cfg.acara || 'acara ini');
+  const pesan = (l) => pilihPesan(cfg.pesan)
+    .replaceAll('{salam}', salamWaktu()).replaceAll('{nama}', l.nama).replaceAll('{no}', daftarNo(l)).replaceAll('{acara}', cfg.acara || 'acara ini');
 
   // satu pengingat untuk semua alat orang yang sama (tidak kirim berkali-kali)
   const ingatkan = (l) => {
@@ -512,6 +512,11 @@ function Dashboard({ user, rid, isSuper, myKey }) {
       }
       doc.save(`laporan-interpreter-${new Date().toISOString().slice(0, 10)}.pdf`);
     } catch (e) {
+      if (/dynamically imported module|Importing a module script failed|Failed to fetch/i.test(e?.message || '')) {
+        // halaman lama (cache) setelah ada update: muat ulang otomatis
+        if (confirm('Halaman ini versi lama karena baru ada pembaruan. Muat ulang sekarang? Setelah itu klik Unduh PDF lagi.')) location.reload();
+        return;
+      }
       alert('Gagal membuat PDF (' + (e?.message || '?') + '). Pastikan internet aktif lalu coba lagi.');
     }
   };
