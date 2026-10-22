@@ -325,6 +325,25 @@ function Dashboard({ user }) {
     setQueue((x) => x.filter((id) => !ids.includes(id)));
   };
 
+  // ganti nomor alat (alat bermasalah / salah ketik nomor)
+  const gantiAlat = async (l) => {
+    const baru = (prompt(`Ganti nomor alat untuk ${l.nama}.\nNomor sekarang: ${l.receiver}\n\nMasukkan nomor alat PENGGANTI:`, '') || '').trim().toUpperCase();
+    if (!baru) return;
+    if (!/^[A-Z0-9-]{1,6}$/.test(baru)) return alert('Nomor alat tidak valid (huruf/angka, maks. 6 karakter).');
+    if (baru === l.receiver) return alert('Nomornya sama dengan yang sekarang.');
+    const pakai = aktif.find((x) => x.receiver === baru);
+    if (pakai) return alert(`No. ${baru} sedang dipinjam oleh ${pakai.nama}. Pilih nomor lain, atau tandai alat itu kembali dulu.`);
+    if (!confirm(`Ganti No. ${l.receiver} → No. ${baru} untuk ${l.nama}?\n(No. ${l.receiver} akan bebas dipinjam lagi.)`)) return;
+    try {
+      await update(ref(db, 'interpreter'), {
+        [`pinjam/${l.id}/receiver`]: baru,
+        [`pinjam/${l.id}/catatanGanti`]: ((l.catatanGanti ? l.catatanGanti + '; ' : '') + `${l.receiver}→${baru} (${fmtJam(Date.now())})`).slice(-200),
+        [`aktif/${l.receiver}`]: null,
+        [`aktif/${baru}`]: l.id,
+      });
+    } catch { alert('Gagal mengganti nomor alat. Pastikan Rules Firebase terbaru sudah di-Publish, lalu coba lagi.'); }
+  };
+
   const kembaliSemua = async (l) => {
     const sau = saudara(l);
     if (!confirm(`${sau.length} alat atas nama ${l.nama} (No. ${daftarNo(l)}) sudah kembali semua?`)) return;
@@ -431,6 +450,7 @@ function Dashboard({ user }) {
                 <b>{l.nama}</b>
                 <span>{l.institusi}</span>
                 {tab === 'aktif' && saudara(l).length > 1 && <span className="group">📦 {saudara(l).length} alat atas nama ini: No. {daftarNo(l)}</span>}
+                {l.catatanGanti && <span className="group">🔁 Ganti alat: {l.catatanGanti}</span>}
                 <span>{l.hp} · pinjam {fmtJam(l.waktu)}{l.kembaliWaktu ? ` · kembali ${fmtJam(l.kembaliWaktu)}` : ''}</span>
                 {nilai[l.id] && <span>Nilai: pelayanan <span className="star-sm">{nilai[l.id].pelayanan}★</span> · alat <span className="star-sm">{nilai[l.id].alat}★</span></span>}
                 {l.reminderJumlah > 0 && <span className="muted">Diingatkan {l.reminderJumlah}× (terakhir {fmtJam(l.reminderTerakhir)})</span>}
@@ -439,6 +459,7 @@ function Dashboard({ user }) {
                 {tab === 'aktif' ? (
                   <>
                     <button className="btn primary" onClick={() => sudahKembali(l)}>✓ Sudah kembali</button>
+                    <button className="btn" onClick={() => gantiAlat(l)}>✎ Ganti no. alat</button>
                     {saudara(l).length > 1 && <button className="btn" onClick={() => kembaliSemua(l)}>✓ Semua ({saudara(l).length})</button>}
                     <button className="btn" onClick={() => ingatkan(l)}>🔔 Ingatkan</button>
                   </>

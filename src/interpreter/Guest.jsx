@@ -131,14 +131,15 @@ export default function Guest() {
     if (!ready || !ids) { setSt({}); setRated(false); return; }
     const list = ids.split(',');
     const offs = list.map((id) => onValue(ref(db, 'interpreter/pinjam/' + id),
-      (s) => setSt((p) => ({ ...p, [id]: s.val()?.status || null })), () => {}));
+      (s) => setSt((p) => ({ ...p, [id]: s.val() ? { status: s.val().status, receiver: s.val().receiver } : null })), () => {}));
     offs.push(onValue(ref(db, 'interpreter/nilai/' + list[0]), (s) => setRated(s.exists()), () => {}));
     return () => offs.forEach((o) => o());
   }, [ready, ids]);
 
   const ushers = Object.entries(cfg.bantuan || {}).map(([id, v]) => ({ id, ...v }));
   const set_ = (k) => (e) => setF({ ...f, [k]: e.target.value });
-  const nomorAlat = loans.map((l) => l.receiver).join(', ');
+  const noNow = (l) => st[l.id]?.receiver || l.receiver; // nomor terkini (bisa diganti Usher)
+  const nomorAlat = loans.map(noNow).join(', ');
 
   const kirim = async (e) => {
     e.preventDefault();
@@ -200,7 +201,7 @@ export default function Guest() {
 
   // ====== halaman sesudah terdaftar ======
   if (loans.length && !adding) {
-    const semuaKembali = loans.every((l) => l.id && st[l.id] === 'kembali');
+    const semuaKembali = loans.every((l) => l.id && st[l.id]?.status === 'kembali');
     return (
       <div className="wrap">
         {head}
@@ -212,11 +213,11 @@ export default function Guest() {
           <div className="card center">
             <div className="big">🙏</div>
             <h2>{t.thanks(base.nama)}</h2>
-            {loans.length === 1 ? <p>{t.doneText(base.receiver)}</p> : <p className="muted">{t.devicesTitle}</p>}
+            {loans.length === 1 ? <p>{t.doneText(noNow(base))}</p> : <p className="muted">{t.devicesTitle}</p>}
             {loans.length > 1 && loans.map((l) => (
               <div className="row devrow" key={l.id}>
-                <b>Receiver No. {l.receiver}</b>
-                <span className={'badge' + (st[l.id] === 'kembali' ? ' ok' : '')}>{st[l.id] === 'kembali' ? '✓ ' + t.stBack : t.stOut}</span>
+                <b>Receiver No. {noNow(l)}</b>
+                <span className={'badge' + (st[l.id]?.status === 'kembali' ? ' ok' : '')}>{st[l.id]?.status === 'kembali' ? '✓ ' + t.stBack : t.stOut}</span>
               </div>
             ))}
             <p className="muted">{t.doneHint}</p>
