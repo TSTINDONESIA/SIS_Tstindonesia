@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { ref, onValue, push, update, set, serverTimestamp } from 'firebase/database';
 import { auth, db } from '../firebase.js';
-import { waLink, validContact, rcvNorm, rcvKey, RCV_OK, basePath } from './util.js';
+import { waLink, validContact, rcvNorm, rcvKey, RCV_OK, basePath, jaminanAktif, jaminanInfo } from './util.js';
 import { T, initLang, saveLang } from './i18n.js';
 
 const KEY = 'tst-interpreter-last';
@@ -132,7 +132,7 @@ export default function Guest({ rid = '' }) {
   const [ready, setReady] = useState(false);
   const [cfg, setCfg] = useState({});
   const [cfgOk, setCfgOk] = useState(false);
-  const [f, setF] = useState({ nama: '', hp: '', institusi: '', receiver: '' });
+  const [f, setF] = useState({ nama: '', hp: '', institusi: '', receiver: '', jaminan: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [loans, setLoans] = useState(loadLoans);   // semua alat milik tamu ini
@@ -179,6 +179,7 @@ export default function Guest({ rid = '' }) {
     .map(([key, v]) => ({ key, ch: v.ch, bahasa: v.bahasa }))
     .sort((a, b) => Number(a.ch) - Number(b.ch));
   const ushers = Object.entries(cfg.bantuan || {}).map(([id, v]) => ({ id, ...v }));
+  const opsiJam = jaminanAktif(cfg);              // kosong = fitur jaminan mati
   const set_ = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const noNow = (l) => st[l.id]?.receiver || l.receiver; // nomor terkini (bisa diganti Usher)
   const nomorAlat = loans.map(noNow).join(', ');
@@ -194,9 +195,11 @@ export default function Guest({ rid = '' }) {
       receiver: rcvNorm(f.receiver),
     };
     d.kunci = rcvKey(d.receiver);
+    if (opsiJam.length) d.jaminan = pendek && base?.jaminan ? base.jaminan : f.jaminan;
     if (!d.nama || !d.institusi) return setErr(t.errReq);
     if (!validContact(d.hp)) return setErr(t.errContact);
     if (!RCV_OK.test(d.receiver)) return setErr(t.errRcv);
+    if (opsiJam.length && !opsiJam.some((j) => j.k === d.jaminan)) return setErr(t.errJam);
     setBusy(true);
     try {
       const id = push(ref(db, B + '/pinjam')).key;
@@ -206,11 +209,11 @@ export default function Guest({ rid = '' }) {
         ['pinjam/' + id]: { ...d, uid: auth.currentUser.uid, waktu: serverTimestamp(), status: 'dipinjam' },
         ['aktif/' + d.kunci]: id,
       });
-      const next = [...loans, { id, nama: d.nama, hp: d.hp, institusi: d.institusi, receiver: d.receiver, t: Date.now() }];
+      const next = [...loans, { id, nama: d.nama, hp: d.hp, institusi: d.institusi, receiver: d.receiver, jaminan: d.jaminan || '', t: Date.now() }];
       saveLoans(next);
       setLoans(next);
       setAdding(false);
-      setF({ nama: '', hp: '', institusi: '', receiver: '' });
+      setF({ nama: '', hp: '', institusi: '', receiver: '', jaminan: '' });
     } catch (e2) {
       setErr(t.errSave(d.receiver, e2.code || '?'));
     }
@@ -219,9 +222,9 @@ export default function Guest({ rid = '' }) {
 
   const tamuBaru = () => {
     saveLoans([]); setLoans([]); setAdding(false); setSt({}); setRated(false); setErr('');
-    setF({ nama: '', hp: '', institusi: '', receiver: '' });
+    setF({ nama: '', hp: '', institusi: '', receiver: '', jaminan: '' });
   };
-  const tambahAlat = () => { setErr(''); setF({ nama: base?.nama || '', hp: base?.hp || '', institusi: base?.institusi || '', receiver: '' }); setAdding(true); };
+  const tambahAlat = () => { setErr(''); setF({ nama: base?.nama || '', hp: base?.hp || '', institusi: base?.institusi || '', receiver: '', jaminan: base?.jaminan || '' }); setAdding(true); };
 
   const head = (
     <>
@@ -276,6 +279,7 @@ export default function Guest({ rid = '' }) {
                 <span className={'badge' + (st[l.id]?.status === 'kembali' ? ' ok' : '')}>{st[l.id]?.status === 'kembali' ? '✓ ' + t.stBack : t.stOut}</span>
               </div>
             ))}
+            {jaminanInfo(base.jaminan) && <p className="jamdone">{jaminanInfo(base.jaminan).ic} {t.jamDone(jaminanInfo(base.jaminan)[lang])}</p>}
             <p className="muted">{t.doneHint}</p>
           </div>
         )}
@@ -315,6 +319,21 @@ export default function Guest({ rid = '' }) {
               <input value={f.institusi} onChange={set_('institusi')} maxLength={100} required />
             </label>
           </>
+        )}
+        {!pendek && opsiJam.length > 0 && (
+          <div className="jamgrp" role="radiogroup" aria-label={t.jamTitle}>
+            <b>{t.jamTitle}</b>
+            <span className="muted fine">{t.jamHint}</span>
+            <div className="jamopts">
+              {opsiJam.map((j) => (
+                <button type="button" key={j.k} role="radio" aria-checked={f.jaminan === j.k}
+                  className={'jamopt' + (f.jaminan === j.k ? ' on' : '')} onClick={() => setF({ ...f, jaminan: j.k })}>
+                  <span className="jic">{j.ic}</span>{j[lang]}
+                </button>
+              ))}
+            </div>
+            {opsiJam.some((j) => j.k === 'password') && <span className="muted fine">🔒 {t.jamPwNote}</span>}
+          </div>
         )}
         <label>{t.rcv}
           <input value={f.receiver} onChange={(e) => setF({ ...f, receiver: rcvNorm(e.target.value) })} inputMode="text" autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false} maxLength={8} placeholder="A001 / B001 / 01" className="rcv" required />

@@ -96,3 +96,18 @@ a.btn,a.link{text-decoration:none}
 .petugas{display:flex;flex-direction:column;gap:8px;background:#06101F;border:1px solid #1B2D4A;border-radius:12px;padding:12px}
 .petugas select{padding:11px;border-radius:10px;border:1px solid #2A4066;background:#0D1B30;color:#fff;font:inherit;font-size:14px}
 .who{font-size:13px;color:#93C5FD;margin-top:4px}
+
+/* ===== Jaminan ===== */
+.jamgrp{display:flex;flex-direction:column;gap:6px;font-size:13px}
+.jamopts{display:grid;grid-template-columns:1fr 1fr;gap:8px}
+.jamopt{display:flex;align-items:center;gap:8px;padding:12px 10px;border-radius:10px;border:1px solid #2A4066;background:#06101F;color:#C9D6EC;font:inherit;font-size:14px;font-weight:700;cursor:pointer;text-align:left}
+.jamopt .jic{font-size:22px}
+.jamopt.on{background:#123A7A;border-color:#60A5FA;color:#fff;box-shadow:0 0 0 2px #2563EB}
+.jamdone{background:#06101F;border:1px solid #2F5FB3;border-radius:10px;padding:10px;font-size:13px;color:#BFD6FF}
+.jam{display:inline-flex;align-items:center;gap:8px;align-self:flex-start;margin:4px 0;padding:6px 12px 6px 8px;border-radius:10px;background:#123A7A;border:1px solid #2F5FB3;color:#fff!important;font-size:14px;font-weight:800}
+.jam .jic{font-size:26px;line-height:1}
+.jam small{font-weight:600;color:#BFD6FF;font-size:11px}
+.jam.back{background:#0B2A1A;border-color:#166534;opacity:.85}
+.jamset{display:flex;flex-direction:column;gap:8px}
+.jamset label.chk{flex-direction:row;align-items:center;gap:10px;font-size:14px;font-weight:600}
+.jamset input[type=checkbox]{width:20px;height:20px;padding:0;flex:none}

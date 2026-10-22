@@ -48,3 +48,10 @@ Satu project Firebase, banyak ruangan/acara. **Acara utama lama tidak berubah**:
 **Alur tiap acara**: Super Admin buat ruangan (nama, tanggal, jam mulai/selesai) -> buka dashboard ruangan -> Pengaturan -> isi **Channel bahasa** -> cetak QR dari panel Super Admin. Nomor teknisi dan teks pengingat disalin dari acara utama saat ruangan dibuat; daftar Usher dan channel mulai kosong. Menghapus Usher di dalam ruangan hanya melepas dari ruangan itu, tidak mencabut hak login.
 
 **Akses per ruangan (v1.4)**: dashboard ruangan hanya bisa dibuka oleh petugas yang ditugaskan Super Admin (panel `#/admin` -> tombol **👥 Petugas** pada ruangan) dan oleh Super Admin. Dijaga di Rules database, bukan hanya disembunyikan di menu. Acara utama (default) tetap bisa dibuka semua Usher seperti semula. Ruangan yang belum punya petugas hanya bisa dibuka Super Admin. Pasang Rules terbaru bersamaan dengan kode baru.
+
+## Jaminan peminjaman (v1.5)
+- **Super Admin**: dashboard -> tab **Pengaturan** -> kartu **🪪 Jaminan peminjaman**: aktifkan, lalu centang jenis yang boleh dipilih (KTP, SIM, Paspor, Kartu nama, Password/PIN HP). Berlaku per ruangan/acara; minimal satu jenis (disarankan Kartu nama).
+- **Tamu**: bila aktif, form menampilkan pilihan jaminan (wajib pilih satu). Menambah alat atas nama yang sama memakai jaminan yang sama.
+- **Usher**: tiap peminjam menampilkan ikon + nama jaminan, dan dialog "Sudah kembali" mengingatkan jaminan mana yang harus dikembalikan. Kolom Jaminan ikut di CSV/PDF.
+- Hanya JENIS jaminan yang dicatat, bukan nomor KTP/password. Password tidak diketik di web.
+- **Tempel ulang `database.rules.json`** (field `jaminan`, `kembaliOleh`, `kembaliOlehHp`) lalu Publish.

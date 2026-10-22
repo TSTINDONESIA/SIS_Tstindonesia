@@ -48,3 +48,21 @@ export const jadwalText = (r) => {
   const [y, m, d] = String(r.tanggal).split('-').map(Number);
   return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + r.mulai + '–' + r.selesai;
 };
+
+// Jaminan peminjaman. Superadmin memilih jenis yang diizinkan; tamu memilih salah satu.
+// Yang disimpan hanya KODE jenisnya (bukan isi/nomor/password). Barang fisik dipegang Usher.
+export const JAMINAN = [
+  { k: 'ktp', ic: '🪪', id: 'KTP', en: 'ID card (KTP)' },
+  { k: 'sim', ic: '🚗', id: 'SIM', en: "Driver's license (SIM)" },
+  { k: 'paspor', ic: '📕', id: 'Paspor', en: 'Passport' },
+  { k: 'kartunama', ic: '📇', id: 'Kartu nama', en: 'Business card' },
+  { k: 'password', ic: '🔑', id: 'Password / PIN HP', en: 'Phone password / PIN' },
+];
+export const JAMINAN_DEFAULT = ['ktp', 'sim', 'kartunama'];
+export const jaminanInfo = (k) => JAMINAN.find((j) => j.k === k) || null;
+// daftar jenis yang aktif untuk sebuah ruangan ([] bila fitur mati)
+export const jaminanAktif = (cfg) => {
+  const j = cfg && cfg.jaminan;
+  if (!j || !j.aktif) return [];
+  return JAMINAN.filter((x) => j.jenis && j.jenis[x.k]);
+};

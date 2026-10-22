@@ -67,6 +67,11 @@ export const T = {
     ],
     guideClose: 'Tutup',
     roomNone: 'Ruangan tidak ditemukan. Periksa kembali QR/link dari petugas.',
+    jamTitle: 'Jaminan peminjaman',
+    jamHint: 'Pilih satu jaminan yang Anda serahkan kepada petugas. Jaminan dikembalikan saat alat kami terima kembali.',
+    jamPwNote: 'Untuk password/PIN: jangan diketik di sini, sampaikan langsung kepada petugas.',
+    errJam: 'Mohon pilih salah satu jaminan.',
+    jamDone: (n) => `Jaminan Anda: ${n}. Petugas akan mengembalikannya setelah alat diterima kembali.`,
   },
   en: {
     brandSub: 'Interpreter Service',
@@ -135,6 +140,11 @@ export const T = {
     ],
     guideClose: 'Close',
     roomNone: 'Room not found. Please check the QR/link from our staff.',
+    jamTitle: 'Security deposit',
+    jamHint: 'Choose one item to leave with our staff. It will be returned when we receive the device back.',
+    jamPwNote: 'For a password/PIN: do not type it here, tell our staff in person.',
+    errJam: 'Please choose one deposit item.',
+    jamDone: (n) => `Your deposit: ${n}. Our staff will return it once the device is received back.`,
   },
 };
 

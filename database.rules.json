@@ -66,6 +66,15 @@
           "kunci": {
             ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,8}$/)"
           },
+          "jaminan": {
+            ".validate": "newData.isString()&&newData.val().matches(/^[a-z]{2,12}$/)"
+          },
+          "kembaliOleh": {
+            ".validate": "newData.isString()&&newData.val().length<=80"
+          },
+          "kembaliOlehHp": {
+            ".validate": "newData.isString()&&newData.val().length<=20"
+          },
           "$other": {
             ".validate": false
           }
@@ -156,6 +165,15 @@
               },
               "kunci": {
                 ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,8}$/)"
+              },
+              "jaminan": {
+                ".validate": "newData.isString()&&newData.val().matches(/^[a-z]{2,12}$/)"
+              },
+              "kembaliOleh": {
+                ".validate": "newData.isString()&&newData.val().length<=80"
+              },
+              "kembaliOlehHp": {
+                ".validate": "newData.isString()&&newData.val().length<=20"
               },
               "$other": {
                 ".validate": false

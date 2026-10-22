@@ -3,7 +3,19 @@ import { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, sign
 import { ref, onValue, update, push, remove, get, set, serverTimestamp } from 'firebase/database';
 import QRCode from 'qrcode';
 import { auth, db } from '../firebase.js';
-import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, pilihPesan, salamWaktu, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK, basePath, slug, statusRuang, jadwalText } from './util.js';
+import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, pilihPesan, salamWaktu, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK, basePath, slug, statusRuang, jadwalText, JAMINAN, JAMINAN_DEFAULT, jaminanInfo } from './util.js';
+
+const jamLabel = (k) => { const j = jaminanInfo(k); return j ? `${j.ic} ${j.id}` : ''; };
+function JaminanChip({ k, kembali }) {
+  const j = jaminanInfo(k);
+  if (!j) return null;
+  return (
+    <span className={'jam' + (kembali ? ' back' : '')}>
+      <span className="jic">{j.ic}</span>
+      <span>Jaminan: {j.id}{!kembali && <><br /><small>kembalikan ke tamu saat alat kembali</small></>}</span>
+    </span>
+  );
+}
 
 const natural = (a, b) => String(a.receiver).localeCompare(String(b.receiver), undefined, { numeric: true });
 
@@ -100,6 +112,8 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
   const [tHp, setTHp] = useState(cfg.teknisi?.hp || '');
   const [chs, setChs] = useState(() => Object.values(cfg.channels || {})
     .sort((a, b) => Number(a.ch) - Number(b.ch)).map((v) => ({ ch: String(v.ch), bahasa: v.bahasa })));
+  const [jamOn, setJamOn] = useState(!!cfg.jaminan?.aktif);
+  const [jamJenis, setJamJenis] = useState(() => (cfg.jaminan?.jenis ? Object.keys(cfg.jaminan.jenis).filter((k) => cfg.jaminan.jenis[k]) : JAMINAN_DEFAULT));
   const [qr, setQr] = useState('');
   const [resetBuka, setResetBuka] = useState(false);
   const [ketik, setKetik] = useState('');
@@ -119,6 +133,15 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
       await update(ref(db, B + '/config'), { teknisi: { nama: tNama.trim(), hp: tHp.trim() } });
       alert('Nomor teknisi tersimpan. Tombol bantuan di halaman tamu sekarang langsung ke WhatsApp teknisi ini.');
     } catch { alert('Gagal menyimpan nomor teknisi.'); }
+  };
+  const simpanJaminan = async () => {
+    if (jamOn && !jamJenis.length) return alert('Pilih minimal satu jenis jaminan (mis. Kartu nama).');
+    const jenis = {};
+    jamJenis.forEach((k) => { jenis[k] = true; });
+    try {
+      await set(ref(db, B + '/config/jaminan'), { aktif: jamOn, jenis });
+      alert(jamOn ? 'Jaminan DIAKTIFKAN. Tamu wajib memilih salah satu jaminan saat mendaftar.' : 'Jaminan dinonaktifkan. Form tamu tidak menampilkan pilihan jaminan.');
+    } catch { alert('Gagal menyimpan pengaturan jaminan.'); }
   };
   const ubahCh = (i, k, v) => setChs(chs.map((c, j) => (j === i ? { ...c, [k]: v } : c)));
   const simpanCh = async () => {
@@ -155,6 +178,28 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
         <input placeholder="Nomor WhatsApp teknisi, mis. 08123456789" type="tel" value={tHp} onChange={(e) => setTHp(e.target.value)} />
         <button className="btn primary" onClick={simpanTeknisi}>Simpan nomor teknisi</button>
         {tHp && <a className="link" href={waLink(tHp, 'Tes dari halaman Usher TST Indonesia')} target="_blank" rel="noreferrer">Tes buka WhatsApp</a>}
+      </div>
+
+      <div className="card" style={{ borderColor: jamOn ? '#2F5FB3' : undefined }}>
+        <h3>🪪 Jaminan peminjaman</h3>
+        <p className="muted">Bila aktif, tamu wajib memilih salah satu jaminan di halaman tamu. Usher melihat jenis jaminan di setiap peminjam supaya mengembalikan jaminan yang benar. Hanya jenisnya yang dicatat (bukan nomor KTP atau password).</p>
+        <div className="jamset">
+          <label className="chk"><input type="checkbox" checked={jamOn} onChange={(e) => setJamOn(e.target.checked)} /> Aktifkan jaminan untuk {rid ? 'ruangan ini' : 'acara utama'}</label>
+          {jamOn && (
+            <>
+              <span className="muted">Jenis jaminan yang boleh dipilih tamu:</span>
+              {JAMINAN.map((j) => (
+                <label className="chk" key={j.k}>
+                  <input type="checkbox" checked={jamJenis.includes(j.k)}
+                    onChange={(e) => setJamJenis(e.target.checked ? [...jamJenis, j.k] : jamJenis.filter((x) => x !== j.k))} />
+                  <span>{j.ic} {j.id}</span>
+                </label>
+              ))}
+              <span className="muted fine">Saran: sediakan minimal satu pilihan ringan seperti Kartu nama.</span>
+            </>
+          )}
+        </div>
+        <button className="btn primary" onClick={simpanJaminan}>Simpan pengaturan jaminan</button>
       </div>
 
       <div className="card">
@@ -338,7 +383,7 @@ function Dashboard({ user, rid, isSuper, myKey }) {
   const kAlat = (l) => l.kunci || l.receiver;
 
   const sudahKembali = async (l) => {
-    if (!confirm(`Receiver ${l.receiver} (${l.nama}) sudah kembali?`)) return;
+    if (!confirm(`Receiver ${l.receiver} (${l.nama}) sudah kembali?${l.jaminan ? `\n\n${jamLabel(l.jaminan)} — jangan lupa kembalikan jaminan ke tamu.` : ''}`)) return;
     try {
       await update(ref(db, B), {
         [`pinjam/${l.id}/status`]: 'kembali',
@@ -430,7 +475,8 @@ function Dashboard({ user, rid, isSuper, myKey }) {
 
   const kembaliSemua = async (l) => {
     const sau = saudara(l);
-    if (!confirm(`${sau.length} alat atas nama ${l.nama} (No. ${daftarNo(l)}) sudah kembali semua?`)) return;
+    const jams = [...new Set(sau.map((x) => x.jaminan).filter(Boolean))].map(jamLabel).join(', ');
+    if (!confirm(`${sau.length} alat atas nama ${l.nama} (No. ${daftarNo(l)}) sudah kembali semua?${jams ? `\n\nKembalikan jaminan: ${jams}` : ''}`)) return;
     try {
       const upd = {};
       sau.forEach((x) => {
@@ -449,8 +495,8 @@ function Dashboard({ user, rid, isSuper, myKey }) {
   const cur = antrean[0];
 
   const csv = () => {
-    const rows = [['Receiver', 'Nama', 'WhatsApp/Email', 'Institusi', 'Status', 'Waktu pinjam', 'Waktu kembali', 'Diterima oleh', 'Nilai pelayanan', 'Nilai alat', 'Komentar']]
-      .concat([...loans].sort(natural).map((l) => [l.receiver, l.nama, l.hp, l.institusi, l.status, fmtTgl(l.waktu), fmtTgl(l.kembaliWaktu), l.kembaliOleh ?? '', nilai[l.id]?.pelayanan ?? '', nilai[l.id]?.alat ?? '', nilai[l.id]?.komentar ?? '']));
+    const rows = [['Receiver', 'Nama', 'WhatsApp/Email', 'Institusi', 'Jaminan', 'Status', 'Waktu pinjam', 'Waktu kembali', 'Diterima oleh', 'Nilai pelayanan', 'Nilai alat', 'Komentar']]
+      .concat([...loans].sort(natural).map((l) => [l.receiver, l.nama, l.hp, l.institusi, jaminanInfo(l.jaminan)?.id ?? '', l.status, fmtTgl(l.waktu), fmtTgl(l.kembaliWaktu), l.kembaliOleh ?? '', nilai[l.id]?.pelayanan ?? '', nilai[l.id]?.alat ?? '', nilai[l.id]?.komentar ?? '']));
     const text = rows.map((r) => r.map((c) => `"${String(c ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv' }));
@@ -487,9 +533,9 @@ function Dashboard({ user, rid, isSuper, myKey }) {
       };
       autoTable(doc, {
         startY: 102,
-        head: [['No. Alat', 'Nama', 'WhatsApp / Email', 'Institusi', 'Status', 'Pinjam', 'Kembali', 'Diterima oleh', 'Pelayanan', 'Alat']],
+        head: [['No. Alat', 'Nama', 'WhatsApp / Email', 'Institusi', 'Jaminan', 'Status', 'Pinjam', 'Kembali', 'Diterima oleh', 'Pelayanan', 'Alat']],
         body: urut.map((l) => [
-          b(l.receiver), b(l.nama), b(l.hp), b(l.institusi),
+          b(l.receiver), b(l.nama), b(l.hp), b(l.institusi), jaminanInfo(l.jaminan)?.id || '-',
           l.status === 'kembali' ? 'Kembali' : 'Dipinjam',
           fmtTgl(l.waktu), l.kembaliWaktu ? fmtTgl(l.kembaliWaktu) : '-', b(l.kembaliOleh) || '-',
           nilai[l.id]?.pelayanan ?? '-', nilai[l.id]?.alat ?? '-',
@@ -639,6 +685,7 @@ function Dashboard({ user, rid, isSuper, myKey }) {
               <div className="info">
                 <b>{l.nama}</b>
                 <span>{l.institusi}</span>
+                {l.jaminan && <JaminanChip k={l.jaminan} kembali={tab !== 'aktif'} />}
                 {tab === 'aktif' && saudara(l).length > 1 && <span className="group">📦 {saudara(l).length} alat atas nama ini: No. {daftarNo(l)}</span>}
                 {l.catatanGanti && <span className="group">🔁 Ganti alat: {l.catatanGanti}</span>}
                 <span>{l.hp} · pinjam {fmtJam(l.waktu)}{l.kembaliWaktu ? ` · kembali ${fmtJam(l.kembaliWaktu)}` : ''}</span>
