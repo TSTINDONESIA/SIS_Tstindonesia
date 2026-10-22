@@ -28,7 +28,7 @@
         ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
         "$id": {
           ".read": "auth!=null&&data.child('uid').val()===auth.uid",
-          ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.child('uid').val()===auth.uid&&newData.parent().parent().child('aktif').child(newData.child('receiver').val()).val()===$id)",
+          ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.child('uid').val()===auth.uid&&newData.parent().parent().child('aktif').child(newData.child('kunci').val()).val()===$id)",
           ".validate": "newData.hasChildren(['nama','hp','institusi','receiver','waktu','status'])",
           "nama": {
             ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=80"
@@ -40,7 +40,7 @@
             ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=100"
           },
           "receiver": {
-            ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,6}$/)"
+            ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,8}$/)"
           },
           "waktu": {
             ".validate": "newData.val()===now"
@@ -60,6 +60,12 @@
           "uid": {
             ".validate": "newData.isString()&&newData.val().length<=64"
           },
+          "catatanGanti": {
+            ".validate": "newData.isString()&&newData.val().length<=200"
+          },
+          "kunci": {
+            ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,8}$/)"
+          },
           "$other": {
             ".validate": false
           }
@@ -70,7 +76,7 @@
         ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
         "$rcv": {
           ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists())",
-          ".validate": "$rcv.matches(/^[A-Z0-9-]{1,6}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).exists()"
+          ".validate": "$rcv.matches(/^[A-Z0-9-]{1,8}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).exists()"
         }
       },
       "nilai": {

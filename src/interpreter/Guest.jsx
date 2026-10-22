@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { onAuthStateChanged, signInAnonymously } from 'firebase/auth';
 import { ref, onValue, push, update, set, serverTimestamp } from 'firebase/database';
 import { auth, db } from '../firebase.js';
-import { waLink, validContact } from './util.js';
+import { waLink, validContact, rcvNorm, rcvKey, RCV_OK } from './util.js';
 import { T, initLang, saveLang } from './i18n.js';
 
 const KEY = 'tst-interpreter-last';
@@ -149,11 +149,12 @@ export default function Guest() {
       nama: src.nama.trim(),
       hp: src.hp.trim(),
       institusi: src.institusi.trim(),
-      receiver: f.receiver.trim().toUpperCase(),
+      receiver: rcvNorm(f.receiver),
     };
+    d.kunci = rcvKey(d.receiver);
     if (!d.nama || !d.institusi) return setErr(t.errReq);
     if (!validContact(d.hp)) return setErr(t.errContact);
-    if (!/^[A-Z0-9-]{1,6}$/.test(d.receiver)) return setErr(t.errRcv);
+    if (!RCV_OK.test(d.receiver)) return setErr(t.errRcv);
     setBusy(true);
     try {
       const id = push(ref(db, 'interpreter/pinjam')).key;
@@ -161,7 +162,7 @@ export default function Guest() {
       // (gagal otomatis bila nomor receiver itu masih tercatat dipinjam orang lain)
       await update(ref(db, 'interpreter'), {
         ['pinjam/' + id]: { ...d, uid: auth.currentUser.uid, waktu: serverTimestamp(), status: 'dipinjam' },
-        ['aktif/' + d.receiver]: id,
+        ['aktif/' + d.kunci]: id,
       });
       const next = [...loans, { id, nama: d.nama, hp: d.hp, institusi: d.institusi, receiver: d.receiver, t: Date.now() }];
       saveLoans(next);
@@ -261,7 +262,8 @@ export default function Guest() {
           </>
         )}
         <label>{t.rcv}
-          <input value={f.receiver} onChange={set_('receiver')} inputMode="numeric" maxLength={6} className="rcv" required />
+          <input value={f.receiver} onChange={(e) => setF({ ...f, receiver: rcvNorm(e.target.value) })} inputMode="text" autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false} maxLength={8} placeholder="A001 / B001 / 01" className="rcv" required />
+          <span className="muted fine">{t.rcvHint}</span>
         </label>
         {err && <div className="err">{err}</div>}
         <button className="btn primary" disabled={busy || !ready}>{busy ? t.saving : t.submit}</button>

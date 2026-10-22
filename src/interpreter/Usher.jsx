@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, sign
 import { ref, onValue, update, push, remove, get, set, serverTimestamp } from 'firebase/database';
 import QRCode from 'qrcode';
 import { auth, db } from '../firebase.js';
-import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, contactLink, isEmail } from './util.js';
+import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK } from './util.js';
 
 const natural = (a, b) => String(a.receiver).localeCompare(String(b.receiver), undefined, { numeric: true });
 
@@ -264,15 +264,19 @@ function Dashboard({ user }) {
 
   const cari = (arr) => {
     const s = q.trim().toLowerCase();
+    const sk = rcvKey(s).toLowerCase();
     const r = !s ? arr : arr.filter((l) =>
-      String(l.receiver).toLowerCase().includes(s) || (l.nama || '').toLowerCase().includes(s) ||
+      String(l.receiver).toLowerCase().includes(s) || (sk && rcvKey(l.receiver).toLowerCase() === sk) || (l.nama || '').toLowerCase().includes(s) ||
       (l.hp || '').includes(s) || (l.institusi || '').toLowerCase().includes(s));
     return [...r].sort((a, b) => {
-      const ea = String(a.receiver).toLowerCase() === s ? 0 : 1;
-      const eb = String(b.receiver).toLowerCase() === s ? 0 : 1;
+      const ea = String(a.receiver).toLowerCase() === s || rcvKey(a.receiver).toLowerCase() === sk ? 0 : 1;
+      const eb = String(b.receiver).toLowerCase() === s || rcvKey(b.receiver).toLowerCase() === sk ? 0 : 1;
       return ea - eb || natural(a, b);
     });
   };
+
+  // kunci di node "aktif" (data lama memakai nomor apa adanya)
+  const kAlat = (l) => l.kunci || l.receiver;
 
   const sudahKembali = async (l) => {
     if (!confirm(`Receiver ${l.receiver} (${l.nama}) sudah kembali?`)) return;
@@ -280,20 +284,20 @@ function Dashboard({ user }) {
       await update(ref(db, 'interpreter'), {
         [`pinjam/${l.id}/status`]: 'kembali',
         [`pinjam/${l.id}/kembaliWaktu`]: serverTimestamp(),
-        [`aktif/${l.receiver}`]: null,
+        [`aktif/${kAlat(l)}`]: null,
       });
       setQ('');
     } catch { alert('Gagal menyimpan. Cek internet lalu coba lagi.'); }
   };
 
   const batalKembali = async (l) => {
-    const s = await get(ref(db, `interpreter/aktif/${l.receiver}`));
+    const s = await get(ref(db, `interpreter/aktif/${kAlat(l)}`));
     if (s.exists()) return alert(`Nomor ${l.receiver} sekarang sedang dipinjam orang lain.`);
     try {
       await update(ref(db, 'interpreter'), {
         [`pinjam/${l.id}/status`]: 'dipinjam',
         [`pinjam/${l.id}/kembaliWaktu`]: null,
-        [`aktif/${l.receiver}`]: l.id,
+        [`aktif/${kAlat(l)}`]: l.id,
       });
     } catch { alert('Gagal membatalkan.'); }
   };
@@ -327,19 +331,21 @@ function Dashboard({ user }) {
 
   // ganti nomor alat (alat bermasalah / salah ketik nomor)
   const gantiAlat = async (l) => {
-    const baru = (prompt(`Ganti nomor alat untuk ${l.nama}.\nNomor sekarang: ${l.receiver}\n\nMasukkan nomor alat PENGGANTI:`, '') || '').trim().toUpperCase();
+    const baru = rcvNorm(prompt(`Ganti nomor alat untuk ${l.nama}.\nNomor sekarang: ${l.receiver}\n\nMasukkan nomor alat PENGGANTI (mis. A001, B001, 01):`, '') || '');
     if (!baru) return;
-    if (!/^[A-Z0-9-]{1,6}$/.test(baru)) return alert('Nomor alat tidak valid (huruf/angka, maks. 6 karakter).');
-    if (baru === l.receiver) return alert('Nomornya sama dengan yang sekarang.');
-    const pakai = aktif.find((x) => x.receiver === baru);
+    if (!RCV_OK.test(baru)) return alert('Nomor alat tidak valid (huruf/angka, maks. 8 karakter).');
+    if (rcvKey(baru) === rcvKey(l.receiver)) return alert('Nomornya sama dengan yang sekarang.');
+    const pakai = aktif.find((x) => rcvKey(x.receiver) === rcvKey(baru));
     if (pakai) return alert(`No. ${baru} sedang dipinjam oleh ${pakai.nama}. Pilih nomor lain, atau tandai alat itu kembali dulu.`);
     if (!confirm(`Ganti No. ${l.receiver} → No. ${baru} untuk ${l.nama}?\n(No. ${l.receiver} akan bebas dipinjam lagi.)`)) return;
     try {
       await update(ref(db, 'interpreter'), {
         [`pinjam/${l.id}/receiver`]: baru,
+        [`pinjam/${l.id}/kunci`]: rcvKey(baru),
         [`pinjam/${l.id}/catatanGanti`]: ((l.catatanGanti ? l.catatanGanti + '; ' : '') + `${l.receiver}→${baru} (${fmtJam(Date.now())})`).slice(-200),
+        [`aktif/${kAlat(l)}`]: null,
         [`aktif/${l.receiver}`]: null,
-        [`aktif/${baru}`]: l.id,
+        [`aktif/${rcvKey(baru)}`]: l.id,
       });
     } catch { alert('Gagal mengganti nomor alat. Pastikan Rules Firebase terbaru sudah di-Publish, lalu coba lagi.'); }
   };
@@ -352,7 +358,7 @@ function Dashboard({ user }) {
       sau.forEach((x) => {
         upd[`pinjam/${x.id}/status`] = 'kembali';
         upd[`pinjam/${x.id}/kembaliWaktu`] = serverTimestamp();
-        upd[`aktif/${x.receiver}`] = null;
+        upd[`aktif/${kAlat(x)}`] = null;
       });
       await update(ref(db, 'interpreter'), upd);
       setQ('');

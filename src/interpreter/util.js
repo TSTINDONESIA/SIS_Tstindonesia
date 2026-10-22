@@ -20,3 +20,10 @@ export const contactLink = (c, text = '', subject = '') =>
   isEmail(c)
     ? `mailto:${String(c).trim()}?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(text)}`
     : waLink(c, text);
+
+// Nomor receiver: bisa "A001", "B001", atau "01" saja.
+// rcvNorm  : huruf besar, buang spasi/simbol aneh (hanya A-Z, 0-9, strip)
+// rcvKey   : kunci pembanding; nol di depan angka diabaikan, jadi "01"="1" dan "A001"="A1"
+export const rcvNorm = (s) => String(s || '').toUpperCase().replace(/[^A-Z0-9-]/g, '').slice(0, 8);
+export const rcvKey = (s) => rcvNorm(s).replace(/^([A-Z]*-?)0+(?=\d)/, '$1');
+export const RCV_OK = /^[A-Z0-9-]{1,8}$/;
