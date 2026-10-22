@@ -112,8 +112,6 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
   const [tHp, setTHp] = useState(cfg.teknisi?.hp || '');
   const [chs, setChs] = useState(() => Object.values(cfg.channels || {})
     .sort((a, b) => Number(a.ch) - Number(b.ch)).map((v) => ({ ch: String(v.ch), bahasa: v.bahasa })));
-  const [jamOn, setJamOn] = useState(!!cfg.jaminan?.aktif);
-  const [jamJenis, setJamJenis] = useState(() => (cfg.jaminan?.jenis ? Object.keys(cfg.jaminan.jenis).filter((k) => cfg.jaminan.jenis[k]) : JAMINAN_DEFAULT));
   const [qr, setQr] = useState('');
   const [resetBuka, setResetBuka] = useState(false);
   const [ketik, setKetik] = useState('');
@@ -133,15 +131,6 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
       await update(ref(db, B + '/config'), { teknisi: { nama: tNama.trim(), hp: tHp.trim() } });
       alert('Nomor teknisi tersimpan. Tombol bantuan di halaman tamu sekarang langsung ke WhatsApp teknisi ini.');
     } catch { alert('Gagal menyimpan nomor teknisi.'); }
-  };
-  const simpanJaminan = async () => {
-    if (jamOn && !jamJenis.length) return alert('Pilih minimal satu jenis jaminan (mis. Kartu nama).');
-    const jenis = {};
-    jamJenis.forEach((k) => { jenis[k] = true; });
-    try {
-      await set(ref(db, B + '/config/jaminan'), { aktif: jamOn, jenis });
-      alert(jamOn ? 'Jaminan DIAKTIFKAN. Tamu wajib memilih salah satu jaminan saat mendaftar.' : 'Jaminan dinonaktifkan. Form tamu tidak menampilkan pilihan jaminan.');
-    } catch { alert('Gagal menyimpan pengaturan jaminan.'); }
   };
   const ubahCh = (i, k, v) => setChs(chs.map((c, j) => (j === i ? { ...c, [k]: v } : c)));
   const simpanCh = async () => {
@@ -178,28 +167,6 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
         <input placeholder="Nomor WhatsApp teknisi, mis. 08123456789" type="tel" value={tHp} onChange={(e) => setTHp(e.target.value)} />
         <button className="btn primary" onClick={simpanTeknisi}>Simpan nomor teknisi</button>
         {tHp && <a className="link" href={waLink(tHp, 'Tes dari halaman Usher TST Indonesia')} target="_blank" rel="noreferrer">Tes buka WhatsApp</a>}
-      </div>
-
-      <div className="card" style={{ borderColor: jamOn ? '#2F5FB3' : undefined }}>
-        <h3>🪪 Jaminan peminjaman</h3>
-        <p className="muted">Bila aktif, tamu wajib memilih salah satu jaminan di halaman tamu. Usher melihat jenis jaminan di setiap peminjam supaya mengembalikan jaminan yang benar. Hanya jenisnya yang dicatat (bukan nomor KTP atau password).</p>
-        <div className="jamset">
-          <label className="chk"><input type="checkbox" checked={jamOn} onChange={(e) => setJamOn(e.target.checked)} /> Aktifkan jaminan untuk {rid ? 'ruangan ini' : 'acara utama'}</label>
-          {jamOn && (
-            <>
-              <span className="muted">Jenis jaminan yang boleh dipilih tamu:</span>
-              {JAMINAN.map((j) => (
-                <label className="chk" key={j.k}>
-                  <input type="checkbox" checked={jamJenis.includes(j.k)}
-                    onChange={(e) => setJamJenis(e.target.checked ? [...jamJenis, j.k] : jamJenis.filter((x) => x !== j.k))} />
-                  <span>{j.ic} {j.id}</span>
-                </label>
-              ))}
-              <span className="muted fine">Saran: sediakan minimal satu pilihan ringan seperti Kartu nama.</span>
-            </>
-          )}
-        </div>
-        <button className="btn primary" onClick={simpanJaminan}>Simpan pengaturan jaminan</button>
       </div>
 
       <div className="card">
@@ -715,6 +682,53 @@ function Dashboard({ user, rid, isSuper, myKey }) {
   );
 }
 
+function JaminanSetting({ rid }) {
+  const B = basePath(rid);
+  const [muat, setMuat] = useState(false);
+  const [on, setOn] = useState(false);
+  const [jenis, setJenis] = useState(JAMINAN_DEFAULT);
+  const [busy, setBusy] = useState(false);
+  useEffect(() => onValue(ref(db, B + '/config/jaminan'), (sn) => {
+    const v = sn.val();
+    if (v) { setOn(!!v.aktif); setJenis(Object.keys(v.jenis || {}).filter((k) => v.jenis[k])); }
+    setMuat(true);
+  }, () => setMuat(true)), [B]);
+  const simpan = async () => {
+    if (on && !jenis.length) return alert('Pilih minimal satu jenis jaminan (mis. Kartu nama).');
+    const j = {}; jenis.forEach((k) => { j[k] = true; });
+    setBusy(true);
+    try {
+      await set(ref(db, B + '/config/jaminan'), { aktif: on, jenis: j });
+      alert(on ? 'Jaminan DIAKTIFKAN. Tamu wajib memilih salah satu jaminan saat mendaftar.' : 'Jaminan dinonaktifkan.');
+    } catch (e) { alert('Gagal menyimpan (' + (e.code || '?') + '). Pastikan Rules terbaru sudah dipasang.'); }
+    setBusy(false);
+  };
+  return (
+    <div className="petugas">
+      <b>🪪 Jaminan peminjaman</b>
+      <span className="muted fine">Bila aktif, tamu wajib memilih salah satu jaminan. Usher melihat jenisnya di tiap peminjam. Yang dicatat hanya jenisnya (bukan nomor KTP / password).</span>
+      {!muat ? <span className="muted">Memuat…</span> : (
+        <div className="jamset">
+          <label className="chk"><input type="checkbox" checked={on} onChange={(e) => setOn(e.target.checked)} /> Aktifkan jaminan</label>
+          {on && (
+            <>
+              <span className="muted">Jenis yang boleh dipilih tamu:</span>
+              {JAMINAN.map((j) => (
+                <label className="chk" key={j.k}>
+                  <input type="checkbox" checked={jenis.includes(j.k)} onChange={(e) => setJenis(e.target.checked ? [...jenis, j.k] : jenis.filter((x) => x !== j.k))} />
+                  <span>{j.ic} {j.id}</span>
+                </label>
+              ))}
+              <span className="muted fine">Saran: sediakan minimal satu pilihan ringan seperti Kartu nama.</span>
+            </>
+          )}
+          <button className="btn primary" disabled={busy} onClick={simpan}>Simpan pengaturan jaminan</button>
+        </div>
+      )}
+    </div>
+  );
+}
+
 function Qr({ text }) {
   const [src, setSrc] = useState('');
   useEffect(() => { QRCode.toDataURL(text, { width: 480, margin: 2 }).then(setSrc).catch(() => {}); }, [text]);
@@ -732,6 +746,7 @@ function Admin() {
   const [edit, setEdit] = useState('');     // id ruangan yang sedang diubah ('' = buat baru)
   const [qrId, setQrId] = useState('');
   const [busy, setBusy] = useState(false);
+  const [jamId, setJamId] = useState('');          // panel jaminan yang terbuka ('_' = acara utama)
   const [ptId, setPtId] = useState('');          // ruangan yang panel petugasnya terbuka
   const [pt, setPt] = useState({ nama: '', hp: '' });
   const [utama, setUtama] = useState([]);         // daftar Usher acara utama (untuk pilihan cepat)
@@ -849,6 +864,8 @@ function Admin() {
         <h3>Acara utama (default)</h3>
         <p className="muted">Alamat lama <b>#/</b> dan <b>#/usher</b>. Data tetap seperti semula.</p>
         <a className="btn" href="#/usher">Buka dashboard acara utama</a>
+        <button className="btn" onClick={() => setJamId(jamId === '_' ? '' : '_')}>🪪 Jaminan</button>
+        {jamId === '_' && <JaminanSetting rid="" />}
       </div>
 
       {rooms.length === 0 && <p className="muted center">Belum ada ruangan tambahan.</p>}
@@ -863,10 +880,12 @@ function Admin() {
               <a className="btn primary" href={'#/usher/' + r.id}>Dashboard</a>
               <button className="btn" onClick={() => salin(linkTamu(r.id))}>Salin link</button>
               <button className="btn" onClick={() => setPtId(ptId === r.id ? '' : r.id)}>👥 Petugas ({Object.keys(r.petugas || {}).length})</button>
+              <button className="btn" onClick={() => setJamId(jamId === r.id ? '' : r.id)}>🪪 Jaminan</button>
               <button className="btn" onClick={() => setQrId(qrId === r.id ? '' : r.id)}>QR</button>
               <button className="btn" onClick={() => { setEdit(r.id); setF({ nama: r.nama, tanggal: r.tanggal, mulai: r.mulai, selesai: r.selesai }); scrollTo(0, 0); }}>Ubah jadwal</button>
               <button className="link danger" onClick={() => hapus(r)}>Hapus</button>
             </div>
+            {jamId === r.id && <JaminanSetting rid={r.id} />}
             {ptId === r.id && (
               <div className="petugas">
                 <b>Petugas ruangan ini</b>
