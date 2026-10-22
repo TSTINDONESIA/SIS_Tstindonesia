@@ -3,7 +3,7 @@ import { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, sign
 import { ref, onValue, update, push, remove, get, set, serverTimestamp } from 'firebase/database';
 import QRCode from 'qrcode';
 import { auth, db } from '../firebase.js';
-import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN } from './util.js';
+import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, contactLink, isEmail } from './util.js';
 
 const natural = (a, b) => String(a.receiver).localeCompare(String(b.receiver), undefined, { numeric: true });
 
@@ -94,6 +94,8 @@ function Pengaturan({ cfg }) {
   const [pesan, setPesan] = useState(cfg.pesan || DEFAULT_PESAN);
   const [nama, setNama] = useState('');
   const [hp, setHp] = useState('');
+  const [tNama, setTNama] = useState(cfg.teknisi?.nama || '');
+  const [tHp, setTHp] = useState(cfg.teknisi?.hp || '');
   const [qr, setQr] = useState('');
   const link = location.origin + location.pathname.replace(/[^/]*$/, '') + '#/';
   const bantuan = Object.entries(cfg.bantuan || {});
@@ -103,6 +105,13 @@ function Pengaturan({ cfg }) {
   const simpan = async () => {
     await update(ref(db, 'interpreter/config'), { acara: acara.trim(), batasJam: batas, pesan });
     alert('Tersimpan.');
+  };
+  const simpanTeknisi = async () => {
+    if (!/^62[0-9]{8,13}$/.test(waNum(tHp))) return alert('Nomor WhatsApp teknisi tidak valid. Contoh: 08123456789');
+    try {
+      await update(ref(db, 'interpreter/config'), { teknisi: { nama: tNama.trim(), hp: tHp.trim() } });
+      alert('Nomor teknisi tersimpan. Tombol bantuan di halaman tamu sekarang langsung ke WhatsApp teknisi ini.');
+    } catch { alert('Gagal menyimpan nomor teknisi.'); }
   };
   const tambah = async () => {
     if (!nama.trim() || !hp.trim()) return;
@@ -120,6 +129,15 @@ function Pengaturan({ cfg }) {
 
   return (
     <>
+      <div className="card" style={{ borderColor: cfg.teknisi?.hp ? undefined : '#B45309' }}>
+        <h3>🛟 Nomor teknisi (wajib diisi)</h3>
+        <p className="muted">Tamu yang mengalami kendala menekan satu tombol di halaman tamu dan langsung tersambung ke WhatsApp teknisi ini.</p>
+        <input placeholder="Nama teknisi (opsional)" value={tNama} onChange={(e) => setTNama(e.target.value)} />
+        <input placeholder="Nomor WhatsApp teknisi, mis. 08123456789" type="tel" value={tHp} onChange={(e) => setTHp(e.target.value)} />
+        <button className="btn primary" onClick={simpanTeknisi}>Simpan nomor teknisi</button>
+        {tHp && <a className="link" href={waLink(tHp, 'Tes dari halaman Usher TST Indonesia')} target="_blank" rel="noreferrer">Tes buka WhatsApp</a>}
+      </div>
+
       <div className="card">
         <h3>Daftar Usher</h3>
         <p className="muted">Nama + nomor WA. Usher di daftar ini bisa login, dan nomornya tampil di halaman tamu sebagai tombol WhatsApp.</p>
@@ -155,8 +173,40 @@ function Pengaturan({ cfg }) {
   );
 }
 
+const bintang = (n) => '★'.repeat(n) + '☆'.repeat(5 - n);
+const rata = (arr) => (arr.length ? (arr.reduce((a, b) => a + b, 0) / arr.length).toFixed(1) : '-');
+
+function Penilaian({ nilai, loans }) {
+  const byId = Object.fromEntries(loans.map((l) => [l.id, l]));
+  const rows = Object.entries(nilai).map(([id, v]) => ({ id, ...v, loan: byId[id] }))
+    .sort((a, b) => (b.waktu || 0) - (a.waktu || 0));
+  return (
+    <>
+      <div className="nilai">
+        <div><b>{rata(rows.map((r) => r.pelayanan))}</b><span>Pelayanan (1-5)</span></div>
+        <div><b>{rata(rows.map((r) => r.alat))}</b><span>Alat (1-5)</span></div>
+        <div><b>{rows.length}</b><span>Penilaian masuk</span></div>
+      </div>
+      {!rows.length && <p className="muted center">Belum ada penilaian. Penilaian muncul setelah tamu mengembalikan alat.</p>}
+      {rows.map((r) => (
+        <div className="loan" key={r.id}>
+          <div className="no">{r.loan?.receiver || '?'}</div>
+          <div className="info">
+            <b>{r.loan?.nama || 'Tamu'}</b>
+            <span>Pelayanan <span className="star-sm">{bintang(r.pelayanan)}</span></span>
+            <span>Alat <span className="star-sm">{bintang(r.alat)}</span></span>
+            {r.komentar && <span style={{ color: '#E8EEF8' }}>“{r.komentar}”</span>}
+            <span className="muted">{fmtTgl(r.waktu)}</span>
+          </div>
+        </div>
+      ))}
+    </>
+  );
+}
+
 function Dashboard({ user }) {
   const [loans, setLoans] = useState([]);
+  const [nilai, setNilai] = useState({});
   const [cfg, setCfg] = useState({});
   const [tab, setTab] = useState('aktif');
   const [q, setQ] = useState('');
@@ -167,8 +217,9 @@ function Dashboard({ user }) {
     const a = onValue(ref(db, 'interpreter/pinjam'), (s) =>
       setLoans(Object.entries(s.val() || {}).map(([id, v]) => ({ id, ...v }))), () => {});
     const b = onValue(ref(db, 'interpreter/config'), (s) => setCfg(s.val() || {}), () => {});
+    const c = onValue(ref(db, 'interpreter/nilai'), (s) => setNilai(s.val() || {}), () => {});
     const t = setInterval(() => setNow(Date.now()), 30000);
-    return () => { a(); b(); clearInterval(t); };
+    return () => { a(); b(); c(); clearInterval(t); };
   }, []);
 
   const aktif = useMemo(() => loans.filter((l) => l.status === 'dipinjam'), [loans]);
@@ -221,7 +272,7 @@ function Dashboard({ user }) {
     .replaceAll('{nama}', l.nama).replaceAll('{no}', l.receiver).replaceAll('{acara}', cfg.acara || 'acara ini');
 
   const ingatkan = (l) => {
-    window.open(waLink(l.hp, pesan(l)), '_blank');
+    window.open(contactLink(l.hp, pesan(l), 'Pengingat pengembalian receiver interpreter'), '_blank');
     update(ref(db, 'interpreter/pinjam/' + l.id), {
       reminderTerakhir: serverTimestamp(), reminderJumlah: (l.reminderJumlah || 0) + 1,
     }).catch(() => {});
@@ -232,8 +283,8 @@ function Dashboard({ user }) {
   const cur = antrean[0];
 
   const csv = () => {
-    const rows = [['Receiver', 'Nama', 'HP', 'Institusi', 'Status', 'Waktu pinjam', 'Waktu kembali']]
-      .concat([...loans].sort(natural).map((l) => [l.receiver, l.nama, l.hp, l.institusi, l.status, fmtTgl(l.waktu), fmtTgl(l.kembaliWaktu)]));
+    const rows = [['Receiver', 'Nama', 'WhatsApp/Email', 'Institusi', 'Status', 'Waktu pinjam', 'Waktu kembali', 'Nilai pelayanan', 'Nilai alat', 'Komentar']]
+      .concat([...loans].sort(natural).map((l) => [l.receiver, l.nama, l.hp, l.institusi, l.status, fmtTgl(l.waktu), fmtTgl(l.kembaliWaktu), nilai[l.id]?.pelayanan ?? '', nilai[l.id]?.alat ?? '', nilai[l.id]?.komentar ?? '']));
     const text = rows.map((r) => r.map((c) => `"${String(c ?? '').replaceAll('"', '""')}"`).join(',')).join('\n');
     const a = document.createElement('a');
     a.href = URL.createObjectURL(new Blob(['\ufeff' + text], { type: 'text/csv' }));
@@ -264,6 +315,13 @@ function Dashboard({ user }) {
         <div><b>{loans.length}</b><span>Total</span></div>
       </div>
 
+      {!cfg.teknisi?.hp && (
+        <div className="warn">
+          🛟 Nomor teknisi belum diisi — tombol bantuan di halaman tamu belum mengarah ke teknisi.
+          <button className="btn" onClick={() => setTab('atur')}>Isi nomor teknisi</button>
+        </div>
+      )}
+
       {lewatBatas && aktif.length > 0 && (
         <div className="warn">
           ⏰ Lewat batas pengembalian ({cfg.batasJam}) — {aktif.length} alat belum kembali.
@@ -275,7 +333,7 @@ function Dashboard({ user }) {
         <div className="queue">
           <div>Pengingat berikutnya ({antrean.length} sisa):<br /><b>#{cur.receiver} · {cur.nama}</b></div>
           <div className="actions">
-            <button className="btn wa" onClick={() => ingatkan(cur)}>Kirim WA</button>
+            <button className="btn wa" onClick={() => ingatkan(cur)}>{isEmail(cur.hp) ? 'Kirim email' : 'Kirim WA'}</button>
             <button className="btn" onClick={() => setQueue((x) => x.filter((id) => id !== cur.id))}>Lewati</button>
             <button className="btn" onClick={() => setQueue([])}>Stop</button>
           </div>
@@ -283,12 +341,12 @@ function Dashboard({ user }) {
       )}
 
       <div className="tabs">
-        {[['aktif', 'Dipinjam'], ['kembali', 'Sudah kembali'], ['atur', 'Pengaturan']].map(([k, t]) => (
+        {[['aktif', 'Dipinjam'], ['kembali', 'Sudah kembali'], ['nilai', 'Penilaian'], ['atur', 'Pengaturan']].map(([k, t]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t}</button>
         ))}
       </div>
 
-      {tab === 'atur' ? <Pengaturan cfg={cfg} /> : (
+      {tab === 'atur' ? <Pengaturan cfg={cfg} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
         <>
           <input className="search" placeholder="🔍 Cari nomor receiver / nama / HP" value={q}
             onChange={(e) => setQ(e.target.value)} inputMode="search" />
@@ -300,6 +358,7 @@ function Dashboard({ user }) {
                 <b>{l.nama}</b>
                 <span>{l.institusi}</span>
                 <span>{l.hp} · pinjam {fmtJam(l.waktu)}{l.kembaliWaktu ? ` · kembali ${fmtJam(l.kembaliWaktu)}` : ''}</span>
+                {nilai[l.id] && <span>Nilai: pelayanan <span className="star-sm">{nilai[l.id].pelayanan}★</span> · alat <span className="star-sm">{nilai[l.id].alat}★</span></span>}
                 {l.reminderJumlah > 0 && <span className="muted">Diingatkan {l.reminderJumlah}× (terakhir {fmtJam(l.reminderTerakhir)})</span>}
               </div>
               <div className="actions">

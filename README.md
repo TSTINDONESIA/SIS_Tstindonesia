@@ -20,3 +20,11 @@ Tidak ada data atau kode Event Control di repo ini.
 - Usher: `https://USERNAME.github.io/REPO/#/usher` (tab Pengaturan: nomor Usher, acara, batas jam, QR)
 
 Lokal: `npm install` lalu `npm run dev`. Kamera/QR tamu perlu HTTPS (Pages sudah HTTPS).
+
+## Fitur tambahan (v1.1)
+- **Dua bahasa (ID/EN)** di halaman tamu, tombol bahasa di atas; pilihan diingat, default mengikuti bahasa browser. Brand **TST Indonesia** tampil besar di header.
+- **Kontak tamu: nomor WhatsApp atau email.** Pengingat Usher otomatis membuka WhatsApp (nomor) atau aplikasi email (email).
+- **Tombol bantuan teknisi** di halaman tamu: satu klik langsung ke WhatsApp teknisi. Nomornya diisi Usher/Admin di `#/usher` -> Pengaturan -> *Nomor teknisi* (tersimpan di `interpreter/config/teknisi`).
+- **Penilaian singkat** (bintang pelayanan + bintang alat + komentar opsional) muncul di halaman tamu setelah Usher menekan *Sudah kembali*. Hasil + rata-rata ada di tab **Penilaian** dan ikut diunduh di CSV.
+
+**PENTING setelah update:** tempel ulang `database.rules.json` ke Realtime Database -> Rules -> Publish (ada aturan baru untuk `uid` peminjam dan `nilai`). Tanpa ini pendaftaran tamu akan ditolak.

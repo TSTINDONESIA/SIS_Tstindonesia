@@ -37,3 +37,30 @@ input:focus,textarea:focus{outline:2px solid #3B82F6}
 .row{display:flex;justify-content:space-between;align-items:center;font-size:14px}
 .qr{width:240px;max-width:100%;background:#fff;padding:8px;border-radius:10px}
 @media print{body{background:#fff!important;color:#000}.tabs,.stats,.btn,.link,.card:not(:last-child){display:none!important}.card{border:0;background:#fff}}
+
+/* ===== Halaman tamu: bahasa, brand, bantuan, penilaian ===== */
+.langbar{display:flex;align-items:center;justify-content:flex-end;gap:6px;font-size:12px;color:#8FA3C2;margin-bottom:10px}
+.langbar span{margin-right:2px}
+.langbar button{padding:7px 12px;border-radius:999px;border:1px solid #2A4066;background:#0D1B30;color:#C9D6EC;font:inherit;font-size:12px;font-weight:700;cursor:pointer}
+.langbar button.on{background:#2563EB;border-color:#2563EB;color:#fff}
+.brand{display:flex;align-items:center;gap:14px;padding:16px;margin-bottom:14px;border-radius:16px;border:1px solid #2F5FB3;background:linear-gradient(135deg,#123A7A 0%,#0D1B30 80%)}
+.brand img{width:68px;height:68px;border-radius:14px;background:#fff;padding:3px;flex:none}
+.brand-name{font-size:30px;line-height:1.05;font-weight:800;letter-spacing:-.5px;color:#fff}
+.brand-sub{font-size:14px;font-weight:600;color:#BFD6FF;margin-top:3px}
+.brand-event{font-size:12px;color:#8FA3C2;margin-top:4px}
+.fine{font-size:11px;font-weight:500}
+.card.help{background:#0B2A1A;border-color:#16A34A}
+.card.help b{font-size:15px}
+.helpbtn{font-size:16px;padding:15px 14px}
+.stars{display:flex;align-items:center;gap:4px}
+.stars button{background:none;border:0;font-size:36px;line-height:1;color:#2A4066;padding:2px 4px;cursor:pointer}
+.stars button.on{color:#FBBF24}
+.stars button:focus-visible{outline:2px solid #3B82F6;border-radius:6px}
+.starlabel{margin-left:6px}
+.rategrp{display:flex;flex-direction:column;gap:4px;font-size:14px}
+.card.rate{border-color:#FBBF24}
+.tabs button{font-size:12px}
+.nilai{display:grid;grid-template-columns:repeat(3,1fr);gap:8px;margin-bottom:12px}
+.nilai div{background:#0D1B30;border:1px solid #1B2D4A;border-radius:12px;padding:10px;text-align:center}
+.nilai b{display:block;font-size:22px;color:#FBBF24}.nilai span{font-size:11px;color:#8FA3C2}
+.star-sm{color:#FBBF24;letter-spacing:1px}
