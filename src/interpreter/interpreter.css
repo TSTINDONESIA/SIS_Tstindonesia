@@ -68,3 +68,21 @@ input:focus,textarea:focus{outline:2px solid #3B82F6}
 .badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:#3A2A08;color:#FCD34D}
 .badge.ok{background:#0B2A1A;color:#86EFAC}
 .group{font-size:12px;color:#FCD34D}
+
+/* ===== Panduan penggunaan & editor channel ===== */
+.guidebtn{width:100%;margin-bottom:14px;padding:14px;font-size:15px;background:#123A7A;border-color:#2F5FB3}
+.modal-bg{position:fixed;inset:0;z-index:50;background:rgba(3,8,16,.78);display:flex;align-items:flex-end;justify-content:center;padding:0}
+.modal{width:100%;max-width:460px;max-height:92vh;overflow-y:auto;background:#0D1B30;border:1px solid #2F5FB3;border-radius:18px 18px 0 0;padding:18px 16px 22px;display:flex;flex-direction:column;gap:12px}
+@media(min-width:520px){.modal-bg{align-items:center;padding:16px}.modal{border-radius:18px}}
+.steps{margin:0;padding:0;list-style:none;counter-reset:s;display:flex;flex-direction:column;gap:10px}
+.steps>li{counter-increment:s;position:relative;padding-left:38px;display:flex;flex-direction:column;gap:2px;font-size:14px}
+.steps>li::before{content:counter(s);position:absolute;left:0;top:0;width:28px;height:28px;border-radius:50%;background:#2563EB;color:#fff;font-weight:800;display:flex;align-items:center;justify-content:center;font-size:14px}
+.steps>li span{color:#C9D6EC;font-size:13px;line-height:1.45}
+.chlist{margin-top:6px;background:#06101F;border:1px solid #1B2D4A;border-radius:10px;padding:8px 10px;display:flex;flex-direction:column;gap:4px}
+.chlist em{font-style:normal;font-size:11px;font-weight:700;color:#8FA3C2;text-transform:uppercase;letter-spacing:.5px}
+.chrow{display:flex;gap:10px;align-items:center;font-size:14px}
+.chrow b{min-width:52px;color:#60A5FA}
+.tips{background:#3A2A08;border:1px solid #92400E;border-radius:12px;padding:10px 12px;font-size:13px;color:#FCD34D}
+.tips ul{margin:6px 0 0;padding-left:18px;display:flex;flex-direction:column;gap:4px}
+.chedit{display:flex;gap:8px;align-items:center}
+.chedit .chno{width:64px;flex:none;text-align:center;font-weight:800}

@@ -16,6 +16,42 @@ const saveLoans = (a) => {
   try { if (a.length) localStorage.setItem(KEY, JSON.stringify(a)); else localStorage.removeItem(KEY); } catch { /* */ }
 };
 
+function Panduan({ t, channels, onClose }) {
+  useEffect(() => {
+    const k = (e) => { if (e.key === 'Escape') onClose(); };
+    addEventListener('keydown', k);
+    return () => removeEventListener('keydown', k);
+  }, [onClose]);
+  return (
+    <div className="modal-bg" onClick={onClose}>
+      <div className="modal" role="dialog" aria-modal="true" aria-label={t.guideTitle} onClick={(e) => e.stopPropagation()}>
+        <h2>📖 {t.guideTitle}</h2>
+        <ol className="steps">
+          {t.guideSteps.map((s, i) => (
+            <li key={i}>
+              <b>{s.t}</b>
+              <span>{s.d}</span>
+              {i === 2 && (
+                <div className="chlist">
+                  <em>{t.guideChTitle}</em>
+                  {channels.length ? channels.map((c) => (
+                    <div className="chrow" key={c.key}><b>CH {c.ch}</b><span>{c.bahasa}</span></div>
+                  )) : <span className="muted">{t.guideChEmpty}</span>}
+                </div>
+              )}
+            </li>
+          ))}
+        </ol>
+        <div className="tips">
+          <b>⚠️ {t.guideTipsTitle}</b>
+          <ul>{t.guideTips.map((x, i) => <li key={i}>{x}</li>)}</ul>
+        </div>
+        <button className="btn primary" onClick={onClose}>{t.guideClose}</button>
+      </div>
+    </div>
+  );
+}
+
 function Bantuan({ t, teknisi, ushers, no }) {
   if (teknisi && teknisi.hp) {
     return (
@@ -101,6 +137,7 @@ export default function Guest() {
   const [adding, setAdding] = useState(false);     // mode tambah alat (data sama)
   const [st, setSt] = useState({});                // status tiap alat
   const [rated, setRated] = useState(false);
+  const [guide, setGuide] = useState(false);
 
   const base = loans[loans.length - 1];
   const pendek = adding && base?.hp && base?.institusi; // cukup isi nomor receiver
@@ -136,6 +173,9 @@ export default function Guest() {
     return () => offs.forEach((o) => o());
   }, [ready, ids]);
 
+  const channels = Object.entries(cfg.channels || {})
+    .map(([key, v]) => ({ key, ch: v.ch, bahasa: v.bahasa }))
+    .sort((a, b) => Number(a.ch) - Number(b.ch));
   const ushers = Object.entries(cfg.bantuan || {}).map(([id, v]) => ({ id, ...v }));
   const set_ = (k) => (e) => setF({ ...f, [k]: e.target.value });
   const noNow = (l) => st[l.id]?.receiver || l.receiver; // nomor terkini (bisa diganti Usher)
@@ -197,6 +237,8 @@ export default function Guest() {
           {cfg.acara && <div className="brand-event">{cfg.acara}</div>}
         </div>
       </div>
+      <button type="button" className="btn guidebtn" onClick={() => setGuide(true)}>📖 {t.guideBtn}</button>
+      {guide && <Panduan t={t} channels={channels} onClose={() => setGuide(false)} />}
     </>
   );
 

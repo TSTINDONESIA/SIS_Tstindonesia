@@ -96,6 +96,8 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset }) {
   const [hp, setHp] = useState('');
   const [tNama, setTNama] = useState(cfg.teknisi?.nama || '');
   const [tHp, setTHp] = useState(cfg.teknisi?.hp || '');
+  const [chs, setChs] = useState(() => Object.values(cfg.channels || {})
+    .sort((a, b) => Number(a.ch) - Number(b.ch)).map((v) => ({ ch: String(v.ch), bahasa: v.bahasa })));
   const [qr, setQr] = useState('');
   const [resetBuka, setResetBuka] = useState(false);
   const [ketik, setKetik] = useState('');
@@ -115,6 +117,18 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset }) {
       await update(ref(db, 'interpreter/config'), { teknisi: { nama: tNama.trim(), hp: tHp.trim() } });
       alert('Nomor teknisi tersimpan. Tombol bantuan di halaman tamu sekarang langsung ke WhatsApp teknisi ini.');
     } catch { alert('Gagal menyimpan nomor teknisi.'); }
+  };
+  const ubahCh = (i, k, v) => setChs(chs.map((c, j) => (j === i ? { ...c, [k]: v } : c)));
+  const simpanCh = async () => {
+    const baris = chs.map((c) => ({ ch: String(c.ch).replace(/\D/g, '').slice(0, 2), bahasa: c.bahasa.trim() })).filter((c) => c.ch || c.bahasa);
+    if (baris.some((c) => !c.ch || !c.bahasa)) return alert('Setiap baris harus punya nomor channel dan nama bahasa.');
+    if (new Set(baris.map((c) => Number(c.ch))).size !== baris.length) return alert('Ada nomor channel yang dobel.');
+    const data = {};
+    baris.forEach((c) => { data['c' + Number(c.ch)] = { ch: Number(c.ch), bahasa: c.bahasa.slice(0, 40) }; });
+    try {
+      await set(ref(db, 'interpreter/config/channels'), baris.length ? data : null);
+      alert('Daftar channel tersimpan. Langsung tampil di panduan halaman tamu.');
+    } catch { alert('Gagal menyimpan daftar channel.'); }
   };
   const tambah = async () => {
     if (!nama.trim() || !hp.trim()) return;
@@ -139,6 +153,20 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset }) {
         <input placeholder="Nomor WhatsApp teknisi, mis. 08123456789" type="tel" value={tHp} onChange={(e) => setTHp(e.target.value)} />
         <button className="btn primary" onClick={simpanTeknisi}>Simpan nomor teknisi</button>
         {tHp && <a className="link" href={waLink(tHp, 'Tes dari halaman Usher TST Indonesia')} target="_blank" rel="noreferrer">Tes buka WhatsApp</a>}
+      </div>
+
+      <div className="card">
+        <h3>📻 Channel bahasa</h3>
+        <p className="muted">Isi manual sesuai pengaturan di lokasi, mis. Channel 1 = Indonesia, Channel 2 = English. Daftar ini tampil di tombol "Baca tata cara penggunaan" pada halaman tamu.</p>
+        {chs.map((c, i) => (
+          <div className="chedit" key={i}>
+            <input className="chno" inputMode="numeric" placeholder="No" maxLength={2} value={c.ch} onChange={(e) => ubahCh(i, 'ch', e.target.value.replace(/\D/g, ''))} />
+            <input placeholder="Bahasa, mis. Indonesia" maxLength={40} value={c.bahasa} onChange={(e) => ubahCh(i, 'bahasa', e.target.value)} />
+            <button className="link danger" onClick={() => setChs(chs.filter((_, j) => j !== i))}>Hapus</button>
+          </div>
+        ))}
+        <button className="btn" onClick={() => setChs([...chs, { ch: String(chs.length ? Math.max(...chs.map((c) => Number(c.ch) || 0)) + 1 : 1), bahasa: '' }])}>+ Tambah channel</button>
+        <button className="btn primary" onClick={simpanCh}>Simpan channel</button>
       </div>
 
       <div className="card">
