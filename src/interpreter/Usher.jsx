@@ -88,7 +88,7 @@ function Login({ onOk }) {
   );
 }
 
-function Pengaturan({ cfg }) {
+function Pengaturan({ cfg, total, onCsv, onReset }) {
   const [acara, setAcara] = useState(cfg.acara || '');
   const [batas, setBatas] = useState(cfg.batasJam || '');
   const [pesan, setPesan] = useState(cfg.pesan || DEFAULT_PESAN);
@@ -97,6 +97,9 @@ function Pengaturan({ cfg }) {
   const [tNama, setTNama] = useState(cfg.teknisi?.nama || '');
   const [tHp, setTHp] = useState(cfg.teknisi?.hp || '');
   const [qr, setQr] = useState('');
+  const [resetBuka, setResetBuka] = useState(false);
+  const [ketik, setKetik] = useState('');
+  const [resetBusy, setResetBusy] = useState(false);
   const link = location.origin + location.pathname.replace(/[^/]*$/, '') + '#/';
   const bantuan = Object.entries(cfg.bantuan || {});
 
@@ -161,6 +164,33 @@ function Pengaturan({ cfg }) {
         </label>
         <p className="muted">Kode: {'{nama}'} {'{no}'} {'{acara}'}</p>
         <button className="btn primary" onClick={simpan}>Simpan</button>
+      </div>
+
+      <div className="card" style={{ borderColor: '#7F1D1D' }}>
+        <h3>🗑️ Reset data peminjaman</h3>
+        <p className="muted">Menghapus semua data peminjaman, status, dan penilaian ({total} data) untuk acara baru. Daftar Usher, nomor teknisi, dan pengaturan acara tetap ada. Tidak bisa dibatalkan.</p>
+        {!resetBuka ? (
+          <button className="btn" style={{ borderColor: '#B91C1C', color: '#FCA5A5' }} onClick={() => { setResetBuka(true); setKetik(''); }}>Reset data…</button>
+        ) : (
+          <>
+            <div className="err">Konfirmasi: {total} data akan dihapus permanen. Unduh CSV dulu bila masih dibutuhkan.</div>
+            <button className="btn" onClick={onCsv}>⬇ Unduh CSV dulu</button>
+            <label>Ketik <b>RESET</b> untuk melanjutkan
+              <input value={ketik} onChange={(e) => setKetik(e.target.value)} autoCapitalize="characters" autoCorrect="off" placeholder="RESET" />
+            </label>
+            <div className="actions">
+              <button className="btn" style={{ background: '#B91C1C', borderColor: '#B91C1C' }} disabled={ketik.trim().toUpperCase() !== 'RESET' || resetBusy}
+                onClick={async () => {
+                  if (!confirm(`Yakin? ${total} data peminjaman akan dihapus PERMANEN.`)) return;
+                  setResetBusy(true);
+                  const ok = await onReset();
+                  setResetBusy(false);
+                  if (ok) { setResetBuka(false); setKetik(''); }
+                }}>{resetBusy ? 'Menghapus…' : 'Ya, hapus semua'}</button>
+              <button className="btn" onClick={() => { setResetBuka(false); setKetik(''); }}>Batal</button>
+            </div>
+          </>
+        )}
       </div>
 
       <div className="card center">
@@ -292,6 +322,18 @@ function Dashboard({ user }) {
     a.click();
   };
 
+  const resetSemua = async () => {
+    try {
+      await update(ref(db, 'interpreter'), {
+        pinjam: null, aktif: null, nilai: null,
+        'config/resetAt': serverTimestamp(),
+      });
+      setQueue([]); setQ('');
+      alert('Data peminjaman sudah direset. Siap untuk acara baru.');
+      return true;
+    } catch { alert('Gagal mereset. Cek internet lalu coba lagi.'); return false; }
+  };
+
   const list = cari(tab === 'aktif' ? aktif : kembali);
 
   const keluar = async () => {
@@ -346,7 +388,7 @@ function Dashboard({ user }) {
         ))}
       </div>
 
-      {tab === 'atur' ? <Pengaturan cfg={cfg} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
+      {tab === 'atur' ? <Pengaturan cfg={cfg} total={loans.length} onCsv={csv} onReset={resetSemua} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
         <>
           <input className="search" placeholder="🔍 Cari nomor receiver / nama / HP" value={q}
             onChange={(e) => setQ(e.target.value)} inputMode="search" />

@@ -108,6 +108,14 @@ export default function Guest() {
     return onValue(ref(db, 'interpreter/config'), (s) => setCfg(s.val() || {}), (e) => setErr(t.errCfg(e.code || '?')));
   }, [ready]); // eslint-disable-line
 
+  // admin mereset data -> hapus catatan lama di perangkat tamu
+  useEffect(() => {
+    if (done && cfg.resetAt && cfg.resetAt > (done.t || 0)) {
+      try { localStorage.removeItem(KEY); } catch { /* */ }
+      setDone(null); setStatus(null); setRated(false);
+    }
+  }, [cfg.resetAt, done]);
+
   // pantau status pinjaman saya (untuk memunculkan penilaian setelah alat kembali)
   useEffect(() => {
     if (!ready || !done?.id) { setStatus(null); setRated(false); return; }
@@ -140,7 +148,7 @@ export default function Guest() {
         ['pinjam/' + id]: { ...d, uid: auth.currentUser.uid, waktu: serverTimestamp(), status: 'dipinjam' },
         ['aktif/' + d.receiver]: id,
       });
-      const rec = { id, nama: d.nama, receiver: d.receiver };
+      const rec = { id, nama: d.nama, receiver: d.receiver, t: Date.now() };
       try { localStorage.setItem(KEY, JSON.stringify(rec)); } catch { /* abaikan */ }
       setDone(rec);
     } catch (e2) {
@@ -196,7 +204,6 @@ export default function Guest() {
   return (
     <div className="wrap">
       {head}
-      <Bantuan t={t} teknisi={cfg.teknisi} ushers={ushers} no="" />
       <form className="card" onSubmit={kirim}>
         <h2>{t.formTitle}</h2>
         <p className="muted">{t.formHint}</p>

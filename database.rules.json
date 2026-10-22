@@ -25,7 +25,9 @@
       },
       "pinjam": {
         ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+        ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
         "$id": {
+          ".read": "auth!=null&&data.child('uid').val()===auth.uid",
           ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.child('uid').val()===auth.uid&&newData.parent().parent().child('aktif').child(newData.child('receiver').val()).val()===$id)",
           ".validate": "newData.hasChildren(['nama','hp','institusi','receiver','waktu','status'])",
           "nama": {
@@ -55,7 +57,6 @@
           "reminderJumlah": {
             ".validate": "newData.isNumber()"
           },
-          ".read": "auth!=null&&data.child('uid').val()===auth.uid",
           "uid": {
             ".validate": "newData.isString()&&newData.val().length<=64"
           },
@@ -66,6 +67,7 @@
       },
       "aktif": {
         ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+        ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
         "$rcv": {
           ".write": "(auth!=null&&root.child('interpreter/usher/'+auth.uid).exists())||(auth!=null&&!data.exists())",
           ".validate": "$rcv.matches(/^[A-Z0-9-]{1,6}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).exists()"
@@ -73,6 +75,7 @@
       },
       "nilai": {
         ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
+        ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
         "$id": {
           ".read": "auth!=null&&data.child('uid').val()===auth.uid",
           ".write": "auth!=null&&!data.exists()&&newData.child('uid').val()===auth.uid&&root.child('interpreter/pinjam/'+$id+'/uid').val()===auth.uid&&root.child('interpreter/pinjam/'+$id+'/status').val()==='kembali'",
