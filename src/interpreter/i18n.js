@@ -3,8 +3,8 @@ export const T = {
   id: {
     brandSub: 'Layanan Interpreter',
     langLabel: 'Bahasa',
-    formTitle: 'Alat sudah Anda terima?',
-    formHint: 'Lengkapi data singkat ini agar alat tercatat atas nama Anda.',
+    formTitle: 'Selamat datang di TST Indonesia 🙏',
+    formHint: 'Terima kasih atas kehadiran Bapak/Ibu. Dengan hormat, kami mohon kesediaan Bapak/Ibu melengkapi data berikut agar receiver interpreter yang telah diterima dapat kami catat atas nama Bapak/Ibu. Selamat mengikuti acara.',
     name: 'Nama lengkap',
     contact: 'Nomor WhatsApp / Email',
     contactPh: '08xxxxxxxxxx atau nama@email.com',
@@ -44,8 +44,8 @@ export const T = {
   en: {
     brandSub: 'Interpreter Service',
     langLabel: 'Language',
-    formTitle: 'Have you received your device?',
-    formHint: 'Fill in these quick details so the device is registered under your name.',
+    formTitle: 'Welcome to TST Indonesia 🙏',
+    formHint: 'Thank you for joining us. We kindly invite you to complete the details below so that the interpreter receiver you have received can be registered under your name. We wish you a pleasant event.',
     name: 'Full name',
     contact: 'WhatsApp number / Email',
     contactPh: '08xxxxxxxxxx or name@email.com',
