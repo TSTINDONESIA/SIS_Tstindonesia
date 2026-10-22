@@ -249,6 +249,7 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
         <button className="btn primary" onClick={simpanCh}>Simpan channel</button>
       </div>
 
+      {isSuper && (<>
       {rid ? (
         <div className="card">
           <h3>Petugas ruangan</h3>
@@ -312,6 +313,8 @@ function Pengaturan({ cfg, total, onCsv, onPdf, onReset, rid, isSuper }) {
           </>
         )}
       </div>
+
+      </>)}
 
       <div className="card center">
         <h3>QR untuk tamu</h3>
@@ -738,7 +741,7 @@ function Dashboard({ user, rid, isSuper, myKey }) {
       {!cfg.teknisi?.hp && (
         <div className="warn">
           🛟 Nomor teknisi belum diisi — tombol bantuan di halaman tamu belum mengarah ke teknisi.
-          {isSuper ? <button className="btn" onClick={() => setTab('atur')}>Isi nomor teknisi</button> : <span>Hubungi Super Admin.</span>}
+          <button className="btn" onClick={() => setTab('atur')}>Isi nomor teknisi</button>
         </div>
       )}
 
@@ -761,12 +764,12 @@ function Dashboard({ user, rid, isSuper, myKey }) {
       )}
 
       <div className="tabs">
-        {[['aktif', 'Dipinjam'], ['kembali', 'Sudah kembali'], ['nilai', 'Penilaian'], ...(isSuper ? [['atur', 'Pengaturan']] : [])].map(([k, t]) => (
+        {[['aktif', 'Dipinjam'], ['kembali', 'Sudah kembali'], ['nilai', 'Penilaian'], ['atur', 'Pengaturan']].map(([k, t]) => (
           <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t}</button>
         ))}
       </div>
 
-      {tab === 'atur' && isSuper ? <Pengaturan cfg={cfg} total={loans.length} onCsv={csv} onPdf={pdf} onReset={resetSemua} rid={rid} isSuper={isSuper} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
+      {tab === 'atur' ? <Pengaturan cfg={cfg} total={loans.length} onCsv={csv} onPdf={pdf} onReset={resetSemua} rid={rid} isSuper={isSuper} /> : tab === 'nilai' ? <Penilaian nilai={nilai} loans={loans} /> : (
         <>
           <input className="search" placeholder="🔍 Cari nomor receiver / nama / HP" value={q}
             onChange={(e) => setQ(e.target.value)} inputMode="search" />

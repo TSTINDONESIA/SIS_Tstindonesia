@@ -21,7 +21,13 @@
       },
       "config": {
         ".read": "auth!=null",
-        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())"
+        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+        "teknisi": {
+          ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())"
+        },
+        "channels": {
+          ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())"
+        }
       },
       "pinjam": {
         ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
@@ -121,7 +127,13 @@
         "$rid": {
           "config": {
             ".read": "auth!=null",
-            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())"
+            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+            "teknisi": {
+              ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())"
+            },
+            "channels": {
+              ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())"
+            }
           },
           "pinjam": {
             ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
