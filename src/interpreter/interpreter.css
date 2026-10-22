@@ -64,3 +64,7 @@ input:focus,textarea:focus{outline:2px solid #3B82F6}
 .nilai div{background:#0D1B30;border:1px solid #1B2D4A;border-radius:12px;padding:10px;text-align:center}
 .nilai b{display:block;font-size:22px;color:#FBBF24}.nilai span{font-size:11px;color:#8FA3C2}
 .star-sm{color:#FBBF24;letter-spacing:1px}
+.devrow{width:100%;padding:8px 0;border-top:1px solid #1B2D4A;gap:8px;flex-wrap:wrap}
+.badge{font-size:12px;font-weight:700;padding:4px 10px;border-radius:999px;background:#3A2A08;color:#FCD34D}
+.badge.ok{background:#0B2A1A;color:#86EFAC}
+.group{font-size:12px;color:#FCD34D}

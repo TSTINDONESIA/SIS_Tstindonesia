@@ -298,15 +298,46 @@ function Dashboard({ user }) {
     } catch { alert('Gagal membatalkan.'); }
   };
 
-  const pesan = (l) => (cfg.pesan || DEFAULT_PESAN)
-    .replaceAll('{nama}', l.nama).replaceAll('{no}', l.receiver).replaceAll('{acara}', cfg.acara || 'acara ini');
+  // satu orang (kontak sama) bisa membawa lebih dari satu alat
+  const kunci = (l) => (isEmail(l.hp) ? String(l.hp).trim().toLowerCase() : waNum(l.hp));
+  const grup = useMemo(() => {
+    const m = {};
+    aktif.forEach((l) => { (m[kunci(l)] = m[kunci(l)] || []).push(l); });
+    return m;
+  }, [aktif]);
+  const saudara = (l) => [...(grup[kunci(l)] || [l])].sort(natural);
+  const daftarNo = (l) => saudara(l).map((x) => x.receiver).join(', ');
 
+  const pesan = (l) => (cfg.pesan || DEFAULT_PESAN)
+    .replaceAll('{nama}', l.nama).replaceAll('{no}', daftarNo(l)).replaceAll('{acara}', cfg.acara || 'acara ini');
+
+  // satu pengingat untuk semua alat orang yang sama (tidak kirim berkali-kali)
   const ingatkan = (l) => {
+    const sau = saudara(l);
     window.open(contactLink(l.hp, pesan(l), 'Pengingat pengembalian receiver interpreter'), '_blank');
-    update(ref(db, 'interpreter/pinjam/' + l.id), {
-      reminderTerakhir: serverTimestamp(), reminderJumlah: (l.reminderJumlah || 0) + 1,
-    }).catch(() => {});
-    setQueue((x) => x.filter((id) => id !== l.id));
+    const upd = {};
+    sau.forEach((x) => {
+      upd[`pinjam/${x.id}/reminderTerakhir`] = serverTimestamp();
+      upd[`pinjam/${x.id}/reminderJumlah`] = (x.reminderJumlah || 0) + 1;
+    });
+    update(ref(db, 'interpreter'), upd).catch(() => {});
+    const ids = sau.map((x) => x.id);
+    setQueue((x) => x.filter((id) => !ids.includes(id)));
+  };
+
+  const kembaliSemua = async (l) => {
+    const sau = saudara(l);
+    if (!confirm(`${sau.length} alat atas nama ${l.nama} (No. ${daftarNo(l)}) sudah kembali semua?`)) return;
+    try {
+      const upd = {};
+      sau.forEach((x) => {
+        upd[`pinjam/${x.id}/status`] = 'kembali';
+        upd[`pinjam/${x.id}/kembaliWaktu`] = serverTimestamp();
+        upd[`aktif/${x.receiver}`] = null;
+      });
+      await update(ref(db, 'interpreter'), upd);
+      setQ('');
+    } catch { alert('Gagal menyimpan. Cek internet lalu coba lagi.'); }
   };
 
   const antrean = queue.map((id) => aktif.find((l) => l.id === id)).filter(Boolean);
@@ -367,13 +398,13 @@ function Dashboard({ user }) {
       {lewatBatas && aktif.length > 0 && (
         <div className="warn">
           ⏰ Lewat batas pengembalian ({cfg.batasJam}) — {aktif.length} alat belum kembali.
-          <button className="btn" onClick={() => setQueue(aktif.map((l) => l.id))}>Ingatkan semua via WA</button>
+          <button className="btn" onClick={() => setQueue(Object.values(grup).map((g) => g[0].id))}>Ingatkan semua via WA</button>
         </div>
       )}
 
       {cur && (
         <div className="queue">
-          <div>Pengingat berikutnya ({antrean.length} sisa):<br /><b>#{cur.receiver} · {cur.nama}</b></div>
+          <div>Pengingat berikutnya ({antrean.length} sisa):<br /><b>#{daftarNo(cur)} · {cur.nama}</b></div>
           <div className="actions">
             <button className="btn wa" onClick={() => ingatkan(cur)}>{isEmail(cur.hp) ? 'Kirim email' : 'Kirim WA'}</button>
             <button className="btn" onClick={() => setQueue((x) => x.filter((id) => id !== cur.id))}>Lewati</button>
@@ -399,6 +430,7 @@ function Dashboard({ user }) {
               <div className="info">
                 <b>{l.nama}</b>
                 <span>{l.institusi}</span>
+                {tab === 'aktif' && saudara(l).length > 1 && <span className="group">📦 {saudara(l).length} alat atas nama ini: No. {daftarNo(l)}</span>}
                 <span>{l.hp} · pinjam {fmtJam(l.waktu)}{l.kembaliWaktu ? ` · kembali ${fmtJam(l.kembaliWaktu)}` : ''}</span>
                 {nilai[l.id] && <span>Nilai: pelayanan <span className="star-sm">{nilai[l.id].pelayanan}★</span> · alat <span className="star-sm">{nilai[l.id].alat}★</span></span>}
                 {l.reminderJumlah > 0 && <span className="muted">Diingatkan {l.reminderJumlah}× (terakhir {fmtJam(l.reminderTerakhir)})</span>}
@@ -407,6 +439,7 @@ function Dashboard({ user }) {
                 {tab === 'aktif' ? (
                   <>
                     <button className="btn primary" onClick={() => sudahKembali(l)}>✓ Sudah kembali</button>
+                    {saudara(l).length > 1 && <button className="btn" onClick={() => kembaliSemua(l)}>✓ Semua ({saudara(l).length})</button>}
                     <button className="btn" onClick={() => ingatkan(l)}>🔔 Ingatkan</button>
                   </>
                 ) : (

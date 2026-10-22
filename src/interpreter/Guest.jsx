@@ -8,6 +8,14 @@ import { T, initLang, saveLang } from './i18n.js';
 const KEY = 'tst-interpreter-last';
 const logo = import.meta.env.BASE_URL + 'logo.png';
 
+// satu tamu boleh membawa beberapa alat -> disimpan sebagai daftar
+const loadLoans = () => {
+  try { const v = JSON.parse(localStorage.getItem(KEY) || 'null'); return !v ? [] : Array.isArray(v) ? v : [v]; } catch { return []; }
+};
+const saveLoans = (a) => {
+  try { if (a.length) localStorage.setItem(KEY, JSON.stringify(a)); else localStorage.removeItem(KEY); } catch { /* */ }
+};
+
 function Bantuan({ t, teknisi, ushers, no }) {
   if (teknisi && teknisi.hp) {
     return (
@@ -89,11 +97,13 @@ export default function Guest() {
   const [f, setF] = useState({ nama: '', hp: '', institusi: '', receiver: '' });
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
-  const [status, setStatus] = useState(null); // status pinjaman saya: dipinjam | kembali
+  const [loans, setLoans] = useState(loadLoans);   // semua alat milik tamu ini
+  const [adding, setAdding] = useState(false);     // mode tambah alat (data sama)
+  const [st, setSt] = useState({});                // status tiap alat
   const [rated, setRated] = useState(false);
-  const [done, setDone] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(KEY) || 'null'); } catch { return null; }
-  });
+
+  const base = loans[loans.length - 1];
+  const pendek = adding && base?.hp && base?.institusi; // cukup isi nomor receiver
 
   const pilihBahasa = (l) => { setLang(l); saveLang(l); document.documentElement.lang = l; };
   useEffect(() => { document.documentElement.lang = lang; }, []); // eslint-disable-line
@@ -110,30 +120,34 @@ export default function Guest() {
 
   // admin mereset data -> hapus catatan lama di perangkat tamu
   useEffect(() => {
-    if (done && cfg.resetAt && cfg.resetAt > (done.t || 0)) {
-      try { localStorage.removeItem(KEY); } catch { /* */ }
-      setDone(null); setStatus(null); setRated(false);
-    }
-  }, [cfg.resetAt, done]);
+    if (!cfg.resetAt) return;
+    const sisa = loans.filter((l) => !(cfg.resetAt > (l.t || 0)));
+    if (sisa.length !== loans.length) { saveLoans(sisa); setLoans(sisa); setAdding(false); setSt({}); setRated(false); }
+  }, [cfg.resetAt, loans]);
 
-  // pantau status pinjaman saya (untuk memunculkan penilaian setelah alat kembali)
+  // pantau status setiap alat milik saya + penilaian (disimpan di alat pertama)
+  const ids = loans.map((l) => l.id).filter(Boolean).join(',');
   useEffect(() => {
-    if (!ready || !done?.id) { setStatus(null); setRated(false); return; }
-    const a = onValue(ref(db, 'interpreter/pinjam/' + done.id), (s) => setStatus(s.val()?.status || null), () => {});
-    const b = onValue(ref(db, 'interpreter/nilai/' + done.id), (s) => setRated(s.exists()), () => {});
-    return () => { a(); b(); };
-  }, [ready, done?.id]);
+    if (!ready || !ids) { setSt({}); setRated(false); return; }
+    const list = ids.split(',');
+    const offs = list.map((id) => onValue(ref(db, 'interpreter/pinjam/' + id),
+      (s) => setSt((p) => ({ ...p, [id]: s.val()?.status || null })), () => {}));
+    offs.push(onValue(ref(db, 'interpreter/nilai/' + list[0]), (s) => setRated(s.exists()), () => {}));
+    return () => offs.forEach((o) => o());
+  }, [ready, ids]);
 
   const ushers = Object.entries(cfg.bantuan || {}).map(([id, v]) => ({ id, ...v }));
   const set_ = (k) => (e) => setF({ ...f, [k]: e.target.value });
+  const nomorAlat = loans.map((l) => l.receiver).join(', ');
 
   const kirim = async (e) => {
     e.preventDefault();
     setErr('');
+    const src = pendek ? base : f;
     const d = {
-      nama: f.nama.trim(),
-      hp: f.hp.trim(),
-      institusi: f.institusi.trim(),
+      nama: src.nama.trim(),
+      hp: src.hp.trim(),
+      institusi: src.institusi.trim(),
       receiver: f.receiver.trim().toUpperCase(),
     };
     if (!d.nama || !d.institusi) return setErr(t.errReq);
@@ -148,14 +162,22 @@ export default function Guest() {
         ['pinjam/' + id]: { ...d, uid: auth.currentUser.uid, waktu: serverTimestamp(), status: 'dipinjam' },
         ['aktif/' + d.receiver]: id,
       });
-      const rec = { id, nama: d.nama, receiver: d.receiver, t: Date.now() };
-      try { localStorage.setItem(KEY, JSON.stringify(rec)); } catch { /* abaikan */ }
-      setDone(rec);
+      const next = [...loans, { id, nama: d.nama, hp: d.hp, institusi: d.institusi, receiver: d.receiver, t: Date.now() }];
+      saveLoans(next);
+      setLoans(next);
+      setAdding(false);
+      setF({ nama: '', hp: '', institusi: '', receiver: '' });
     } catch (e2) {
       setErr(t.errSave(d.receiver, e2.code || '?'));
     }
     setBusy(false);
   };
+
+  const tamuBaru = () => {
+    saveLoans([]); setLoans([]); setAdding(false); setSt({}); setRated(false); setErr('');
+    setF({ nama: '', hp: '', institusi: '', receiver: '' });
+  };
+  const tambahAlat = () => { setErr(''); setF({ nama: base?.nama || '', hp: base?.hp || '', institusi: base?.institusi || '', receiver: '' }); setAdding(true); };
 
   const head = (
     <>
@@ -176,52 +198,73 @@ export default function Guest() {
     </>
   );
 
-  if (done) {
-    const sudahKembali = status === 'kembali';
+  // ====== halaman sesudah terdaftar ======
+  if (loans.length && !adding) {
+    const semuaKembali = loans.every((l) => l.id && st[l.id] === 'kembali');
     return (
       <div className="wrap">
         {head}
-        {sudahKembali ? (
+        {semuaKembali ? (
           rated ? (
             <div className="card center"><div className="big">🙏</div><h2>{t.rateThanks}</h2></div>
-          ) : <Penilaian t={t} id={done.id} />
+          ) : <Penilaian t={t} id={loans[0].id} />
         ) : (
           <div className="card center">
             <div className="big">🙏</div>
-            <h2>{t.thanks(done.nama)}</h2>
-            <p>{t.doneText(done.receiver)}</p>
+            <h2>{t.thanks(base.nama)}</h2>
+            {loans.length === 1 ? <p>{t.doneText(base.receiver)}</p> : <p className="muted">{t.devicesTitle}</p>}
+            {loans.length > 1 && loans.map((l) => (
+              <div className="row devrow" key={l.id}>
+                <b>Receiver No. {l.receiver}</b>
+                <span className={'badge' + (st[l.id] === 'kembali' ? ' ok' : '')}>{st[l.id] === 'kembali' ? '✓ ' + t.stBack : t.stOut}</span>
+              </div>
+            ))}
             <p className="muted">{t.doneHint}</p>
           </div>
         )}
-        {!sudahKembali && <Bantuan t={t} teknisi={cfg.teknisi} ushers={ushers} no={done.receiver} />}
-        <button className="link" onClick={() => { try { localStorage.removeItem(KEY); } catch { /* */ } setDone(null); setStatus(null); setRated(false); setF({ nama: '', hp: '', institusi: '', receiver: '' }); }}>
-          {t.another}
-        </button>
+        {!semuaKembali && <Bantuan t={t} teknisi={cfg.teknisi} ushers={ushers} no={nomorAlat} />}
+        <button className="btn" style={{ width: '100%', marginBottom: 6 }} onClick={tambahAlat}>＋ {t.addMore}</button>
+        <button className="link" onClick={tamuBaru}>{t.another}</button>
       </div>
     );
   }
 
+  // ====== form pendaftaran (baru / tambah alat) ======
   return (
     <div className="wrap">
       {head}
       <form className="card" onSubmit={kirim}>
-        <h2>{t.formTitle}</h2>
-        <p className="muted">{t.formHint}</p>
-        <label>{t.name}
-          <input value={f.nama} onChange={set_('nama')} autoComplete="name" maxLength={80} required />
-        </label>
-        <label>{t.contact}
-          <input value={f.hp} onChange={set_('hp')} type="text" inputMode="email" placeholder={t.contactPh} autoComplete="email" autoCapitalize="none" maxLength={100} required />
-          <span className="muted fine">{t.contactHint}</span>
-        </label>
-        <label>{t.inst}
-          <input value={f.institusi} onChange={set_('institusi')} maxLength={100} required />
-        </label>
+        {adding ? (
+          <>
+            <h2>{t.addingFor(base?.nama || '')}</h2>
+            <p className="muted">{pendek ? t.addHint : t.formHint}</p>
+          </>
+        ) : (
+          <>
+            <h2>{t.formTitle}</h2>
+            <p className="muted">{t.formHint}</p>
+          </>
+        )}
+        {!pendek && (
+          <>
+            <label>{t.name}
+              <input value={f.nama} onChange={set_('nama')} autoComplete="name" maxLength={80} required />
+            </label>
+            <label>{t.contact}
+              <input value={f.hp} onChange={set_('hp')} type="text" inputMode="email" placeholder={t.contactPh} autoComplete="email" autoCapitalize="none" maxLength={100} required />
+              <span className="muted fine">{t.contactHint}</span>
+            </label>
+            <label>{t.inst}
+              <input value={f.institusi} onChange={set_('institusi')} maxLength={100} required />
+            </label>
+          </>
+        )}
         <label>{t.rcv}
           <input value={f.receiver} onChange={set_('receiver')} inputMode="numeric" maxLength={6} className="rcv" required />
         </label>
         {err && <div className="err">{err}</div>}
         <button className="btn primary" disabled={busy || !ready}>{busy ? t.saving : t.submit}</button>
+        {adding && <button type="button" className="link" onClick={() => { setAdding(false); setErr(''); }}>{t.cancel}</button>}
       </form>
     </div>
   );
