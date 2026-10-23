@@ -4,6 +4,7 @@ import { ref, onValue, push, update, set, serverTimestamp } from 'firebase/datab
 import { auth, db } from '../firebase.js';
 import { waLink, validContact, rcvNorm, rcvKey, RCV_OK, basePath, jaminanAktif, jaminanInfo } from './util.js';
 import { T, initLang, saveLang } from './i18n.js';
+import Scanner from './Scanner.jsx';
 
 const KEY = 'tst-interpreter-last';
 const logo = import.meta.env.BASE_URL + 'logo.png';
@@ -142,6 +143,7 @@ export default function Guest({ rid = '' }) {
   const [st, setSt] = useState({});                // status tiap alat
   const [rated, setRated] = useState(false);
   const [guide, setGuide] = useState(false);
+  const [scan, setScan] = useState(false);
 
   const base = loans[loans.length - 1];
   const pendek = adding && base?.hp && base?.institusi; // cukup isi nomor receiver
@@ -351,6 +353,11 @@ export default function Guest({ rid = '' }) {
           <input value={f.receiver} onChange={(e) => setF({ ...f, receiver: rcvNorm(e.target.value) })} inputMode="text" autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false} maxLength={8} placeholder="A001 / B001 / 01" className="rcv" required />
           <span className="muted fine">{t.rcvHint}</span>
         </label>
+        <button type="button" className="btn scanbtn" onClick={() => setScan(true)}>📷 {t.scanBtn}</button>
+        <span className="muted fine center-t">{t.scanOr}</span>
+        {scan && <Scanner labels={{ title: t.scanTitle, hint: t.scanHint, close: t.scanClose }}
+          onClose={() => setScan(false)}
+          onScan={(no) => { setF((p) => ({ ...p, receiver: no })); setScan(false); }} />}
         {err && <div className="err">{err}</div>}
         <button className="btn primary" disabled={busy || !ready}>{busy ? t.saving : t.submit}</button>
         {adding && <button type="button" className="link" onClick={() => { setAdding(false); setErr(''); }}>{t.cancel}</button>}

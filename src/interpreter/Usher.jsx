@@ -3,6 +3,7 @@ import { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, sign
 import { ref, onValue, update, push, remove, get, set, serverTimestamp } from 'firebase/database';
 import QRCode from 'qrcode';
 import Cetak from './Cetak.jsx';
+import Scanner from './Scanner.jsx';
 import { auth, db } from '../firebase.js';
 import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, pilihPesan, salamWaktu, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK, basePath, slug, statusRuang, jadwalText, JAMINAN, JAMINAN_DEFAULT, jaminanInfo } from './util.js';
 
@@ -372,6 +373,9 @@ function Dashboard({ user, rid, isSuper, myKey }) {
   const [queue, setQueue] = useState([]);
   const [now, setNow] = useState(Date.now());
   const [namaSaya, setNamaSaya] = useState('');
+  const [scanOpen, setScanOpen] = useState(false);
+  const [manual, setManual] = useState('');
+  const [info, setInfo] = useState('');
 
   // nama petugas yang sedang login (dari daftar Usher; akun email memakai emailnya)
   useEffect(() => {
@@ -465,7 +469,22 @@ function Dashboard({ user, rid, isSuper, myKey }) {
         [`aktif/${kAlat(l)}`]: null,
       });
       setQ('');
-    } catch { alert('Gagal menyimpan. Cek internet lalu coba lagi.'); }
+      setInfo(`✓ No. ${l.receiver} (${l.nama}) ditandai sudah kembali.`);
+      return true;
+    } catch { alert('Gagal menyimpan. Cek internet lalu coba lagi.'); return false; }
+  };
+
+  // Alat kembali lewat scan QR atau input manual nomor receiver
+  const prosesNo = async (raw) => {
+    const no = rcvNorm(raw);
+    if (!no) return;
+    const k = rcvKey(no);
+    const l = aktif.find((x) => rcvKey(x.receiver) === k || kAlat(x) === k);
+    if (l) { await sudahKembali(l); return; }
+    const sdh = kembali.filter((x) => rcvKey(x.receiver) === k).sort((a, b) => (b.kembaliWaktu || 0) - (a.kembaliWaktu || 0))[0];
+    setInfo(sdh
+      ? `⚠️ No. ${no} sudah ditandai kembali (${sdh.nama}, ${fmtJam(sdh.kembaliWaktu)}).`
+      : `⚠️ No. ${no} tidak tercatat sedang dipinjam di acara ini.`);
   };
 
   const batalKembali = async (l) => {
@@ -764,6 +783,18 @@ function Dashboard({ user, rid, isSuper, myKey }) {
           </div>
         </div>
       )}
+
+      <div className="card scancard">
+        <b>📷 Terima alat kembali</b>
+        <button className="btn primary" onClick={() => setScanOpen(true)}>Scan QR di alat</button>
+        <form className="manualno" onSubmit={(e) => { e.preventDefault(); prosesNo(manual); setManual(''); }}>
+          <input className="rcv" value={manual} onChange={(e) => setManual(rcvNorm(e.target.value))} inputMode="text" autoCapitalize="characters" autoCorrect="off" autoComplete="off" spellCheck={false} maxLength={8} placeholder="atau ketik nomor: A001" />
+          <button className="btn" disabled={!manual}>Kembali</button>
+        </form>
+        {info && <div className={'scaninfo' + (info.startsWith('✓') ? ' ok' : '')}>{info}</div>}
+      </div>
+      {scanOpen && <Scanner status={info} onClose={() => setScanOpen(false)} onScan={prosesNo}
+        labels={{ title: 'Scan alat kembali', hint: 'Arahkan kamera ke QR di alat. Setelah dikonfirmasi, kamera tetap menyala untuk alat berikutnya.' }} />}
 
       <div className="tabs">
         {[['aktif', 'Dipinjam'], ['kembali', 'Sudah kembali'], ['nilai', 'Penilaian'], ['atur', 'Pengaturan']].map(([k, t]) => (
