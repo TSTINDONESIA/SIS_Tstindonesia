@@ -179,9 +179,9 @@ export default function Cetak() {
         </label>
         <span className="muted fine">Pastikan alamat ini adalah alamat GitHub Pages yang akan dipakai tetap. Kalau alamat berubah, stiker yang sudah ditempel tidak bisa dipakai.</span>
         <label>ID acara (opsional)
-          <input value={rid} onChange={(e) => setRid(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30))} placeholder="kosong = ikut acara aktif" />
+          <input value={rid} onChange={(e) => setRid(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30))} placeholder="kosong = otomatis acara yang berlangsung" />
         </label>
-        <span className="muted fine">Kosongkan agar stiker bisa dipakai ulang di acara berikutnya: QR otomatis mengikuti acara yang ditandai aktif oleh Super Admin. Isi hanya bila stiker khusus satu acara.</span>
+        <span className="muted fine">Kosongkan agar stiker bisa dipakai ulang di acara berikutnya: QR otomatis masuk ke acara yang sedang berlangsung (sesuai rentang tanggal). Isi hanya bila stiker khusus satu acara.</span>
         <code className="urlpreview">{qrIsi(base, contoh, rid)}</code>
       </div>
 

@@ -297,6 +297,9 @@
           },
           "$other": {
             ".validate": false
+          },
+          "tanggalSelesai": {
+            ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
           }
         }
       },
@@ -350,6 +353,25 @@
           ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
           "$rid": {
             ".validate": "newData.val()===true&&($rid==='_'||$rid.matches(/^[a-z0-9-]{1,30}$/))"
+          }
+        }
+      },
+      "jadwalPublik": {
+        ".read": "auth!=null",
+        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+        "$rid": {
+          ".validate": "$rid.matches(/^[a-z0-9-]{1,30}$/)&&newData.hasChildren(['s','e'])",
+          "s": {
+            ".validate": "newData.isNumber()"
+          },
+          "e": {
+            ".validate": "newData.isNumber()"
+          },
+          "a": {
+            ".validate": "newData.val()===true"
+          },
+          "$other": {
+            ".validate": false
           }
         }
       }

@@ -42,12 +42,12 @@ export const basePath = (rid) => (rid ? 'interpreter/rooms/' + rid : 'interprete
 export const RID_OK = /^[a-z0-9-]{1,30}$/;
 export const slug = (s) => String(s || '').toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-+|-+$/g, '').slice(0, 30);
 // jadwal ruangan: tanggal 'YYYY-MM-DD', jam 'HH:MM' (waktu setempat)
-const waktu = (tgl, jam) => { const [y, m, d] = String(tgl).split('-').map(Number); const [h, mi] = String(jam).split(':').map(Number); return new Date(y, m - 1, d, h, mi).getTime(); };
-export const statusRuang = (r, now = Date.now()) => (now < waktu(r.tanggal, r.mulai) ? 'akan' : now > waktu(r.tanggal, r.selesai) ? 'selesai' : 'berlangsung');
-export const jadwalText = (r) => {
-  const [y, m, d] = String(r.tanggal).split('-').map(Number);
-  return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + r.mulai + '–' + r.selesai;
-};
+export const waktu = (tgl, jam) => { const [y, m, d] = String(tgl).split('-').map(Number); const [h, mi] = String(jam).split(':').map(Number); return new Date(y, m - 1, d, h, mi).getTime(); };
+export const tglAkhir = (r) => r.tanggalSelesai || r.tanggal;
+export const statusRuang = (r, now = Date.now()) => (now < waktu(r.tanggal, r.mulai) ? 'akan' : now > waktu(tglAkhir(r), r.selesai) ? 'selesai' : 'berlangsung');
+const fTgl = (t) => { const [y, m, d] = String(t).split('-').map(Number); return new Date(y, m - 1, d).toLocaleDateString('en-GB', { day: 'numeric', month: 'short', year: 'numeric' }); };
+export const jadwalText = (r) =>
+  (tglAkhir(r) !== r.tanggal ? fTgl(r.tanggal) + ' – ' + fTgl(tglAkhir(r)) : fTgl(r.tanggal)) + ' · ' + r.mulai + '–' + r.selesai + (tglAkhir(r) !== r.tanggal ? ' (tiap hari)' : '');
 
 // Jaminan peminjaman. Superadmin memilih jenis yang diizinkan; tamu memilih salah satu.
 // Yang disimpan hanya KODE jenisnya (bukan isi/nomor/password). Barang fisik dipegang Usher.

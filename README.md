@@ -83,3 +83,9 @@ Konsep **Acara utama (default)** sudah dihapus. Semua acara dibuat dari **Super 
 - Cetak label: `#/cetak/<id-acara>` (tombol 🏷️ Label per acara). ID acara dikosongkan = QR mengikuti acara aktif.
 
 **PENTING**: tempel ulang `database.rules.json` (ada node baru `aktifAcara`) lalu Publish.
+
+## Rentang tanggal + QR sama untuk semua acara (v1.8)
+- Buat acara: **Tanggal mulai - Tanggal selesai** + jam mulai/selesai (berlaku tiap hari).
+- QR receiver **tidak berubah antar acara**. Saat discan, tamu otomatis masuk ke acara yang sedang berlangsung hari itu. Bila tidak ada: acara cadangan (tombol ⭐), lalu acara terdekat berikutnya.
+- Jangan buat dua acara dengan tanggal yang bertumpuk bila stiker yang sama dipakai keduanya (QR akan masuk ke acara yang mulai paling akhir).
+- **Tempel ulang `database.rules.json`** (node baru `jadwalPublik`, field `tanggalSelesai`) lalu Publish. Acara yang dibuat sebelum v1.8: klik **Ubah** lalu **Simpan perubahan** sekali agar jadwalnya terdaftar.

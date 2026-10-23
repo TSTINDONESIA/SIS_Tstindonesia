@@ -5,7 +5,7 @@ import QRCode from 'qrcode';
 import Cetak from './Cetak.jsx';
 import Scanner from './Scanner.jsx';
 import { auth, db } from '../firebase.js';
-import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, pilihPesan, salamWaktu, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK, basePath, slug, statusRuang, jadwalText, JAMINAN, JAMINAN_DEFAULT, jaminanInfo } from './util.js';
+import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, pilihPesan, salamWaktu, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK, basePath, slug, statusRuang, jadwalText, waktu, tglAkhir, JAMINAN, JAMINAN_DEFAULT, jaminanInfo } from './util.js';
 
 const jamLabel = (k) => { const j = jaminanInfo(k); return j ? `${j.ic} ${j.id}` : ''; };
 function JaminanChip({ k, kembali }) {
@@ -969,7 +969,7 @@ function Admin() {
   const [rooms, setRooms] = useState([]);
   const [now, setNow] = useState(Date.now());
   const terbaru = rooms.length ? rooms[rooms.length - 1].id : '';   // acara terakhir = sumber salinan bawaan
-  const NEW = () => ({ nama: '', tanggal: hariIni(), mulai: '', selesai: '', jumlah: '', salin: terbaru, salinPetugas: false });
+  const NEW = () => ({ nama: '', tanggal: hariIni(), tanggalSelesai: hariIni(), mulai: '', selesai: '', jumlah: '', salin: terbaru, salinPetugas: false });
   const [f, setF] = useState(NEW);
   const [roomsOk, setRoomsOk] = useState(false);
   const salinInit = useRef(false);
@@ -1036,13 +1036,14 @@ function Admin() {
   const arsipkan = async (r) => {
     const baru = !r.arsip;
     if (baru && !confirm(`Arsipkan "${r.nama}"?\nTamu tidak bisa mendaftar lagi dan acara hilang dari daftar Usher. Data tetap tersimpan, bisa dibuka lagi.`)) return;
-    try { await update(ref(db, 'interpreter'), { ['ruangan/' + r.id + '/arsip']: baru ? true : null, ['rooms/' + r.id + '/config/arsip']: baru ? true : null }); }
+    try { await update(ref(db, 'interpreter'), { ['ruangan/' + r.id + '/arsip']: baru ? true : null, ['rooms/' + r.id + '/config/arsip']: baru ? true : null, ['jadwalPublik/' + r.id + '/a']: baru ? true : null }); }
     catch { alert('Gagal mengubah status arsip.'); }
   };
 
   const simpan = async () => {
     const nama = f.nama.trim();
-    if (!nama || !f.tanggal || !f.mulai || !f.selesai) return alert('Nama ruangan, tanggal, jam mulai, dan jam selesai wajib diisi.');
+    if (!nama || !f.tanggal || !f.tanggalSelesai || !f.mulai || !f.selesai) return alert('Nama acara, tanggal mulai/selesai, jam mulai, dan jam selesai wajib diisi.');
+    if (f.tanggalSelesai < f.tanggal) return alert('Tanggal selesai tidak boleh sebelum tanggal mulai.');
     if (f.selesai <= f.mulai) return alert('Jam selesai harus setelah jam mulai.');
     let id = edit;
     if (!id) {
@@ -1052,12 +1053,15 @@ function Admin() {
     }
     const jml = f.jumlah === '' ? null : parseInt(f.jumlah, 10);
     if (jml != null && !(jml >= 0 && jml <= 100000)) return alert('Jumlah alat pesanan tidak valid.');
-    const data = { nama, tanggal: f.tanggal, mulai: f.mulai, selesai: f.selesai };
+    const data = { nama, tanggal: f.tanggal, tanggalSelesai: f.tanggalSelesai, mulai: f.mulai, selesai: f.selesai };
     const upd = {
       ['ruangan/' + id + '/jumlah']: jml,
       ['rooms/' + id + '/config/jumlahPesan']: jml,
       ['ruangan/' + id + '/nama']: nama,
       ['ruangan/' + id + '/tanggal']: f.tanggal,
+      ['ruangan/' + id + '/tanggalSelesai']: f.tanggalSelesai,
+      ['jadwalPublik/' + id + '/s']: waktu(f.tanggal, f.mulai),
+      ['jadwalPublik/' + id + '/e']: waktu(f.tanggalSelesai, f.selesai),
       ['ruangan/' + id + '/mulai']: f.mulai,
       ['ruangan/' + id + '/selesai']: f.selesai,
       ['rooms/' + id + '/config/acara']: nama,
@@ -1121,7 +1125,7 @@ function Admin() {
     if (ketik == null) return;
     if (ketik.trim() !== r.nama) return alert('Nama tidak cocok. Tidak ada yang dihapus.');
     try {
-      const upd = { ['ruangan/' + r.id]: null, ['rooms/' + r.id]: null };
+      const upd = { ['ruangan/' + r.id]: null, ['rooms/' + r.id]: null, ['jadwalPublik/' + r.id]: null };
       if (aktifId === r.id) upd.aktifAcara = null;
       Object.keys(r.petugas || {}).forEach((k) => { upd['tugas/' + k + '/' + r.id] = null; });
       await update(ref(db, 'interpreter'), upd);
@@ -1147,11 +1151,15 @@ function Admin() {
       <div className="card">
         <h3>{edit ? 'Ubah acara' : '＋ Acara / ruangan baru'}</h3>
         <label>Nama ruangan / acara<input value={f.nama} onChange={set_('nama')} maxLength={60} placeholder="mis. Ruang B · Seminar Siang" disabled={!!edit} /></label>
-        <label>Tanggal<input type="date" value={f.tanggal} onChange={set_('tanggal')} /></label>
         <div className="row2">
-          <label>Mulai<input type="time" value={f.mulai} onChange={set_('mulai')} /></label>
-          <label>Selesai (batas pengembalian)<input type="time" value={f.selesai} onChange={set_('selesai')} /></label>
+          <label>Tanggal mulai<input type="date" value={f.tanggal} onChange={(e) => setF({ ...f, tanggal: e.target.value, tanggalSelesai: f.tanggalSelesai < e.target.value ? e.target.value : f.tanggalSelesai })} /></label>
+          <label>Tanggal selesai<input type="date" min={f.tanggal} value={f.tanggalSelesai} onChange={set_('tanggalSelesai')} /></label>
         </div>
+        <div className="row2">
+          <label>Jam mulai (tiap hari)<input type="time" value={f.mulai} onChange={set_('mulai')} /></label>
+          <label>Jam selesai (batas pengembalian)<input type="time" value={f.selesai} onChange={set_('selesai')} /></label>
+        </div>
+        <span className="muted fine">QR di receiver sama untuk semua acara. Tamu yang scan otomatis masuk ke acara yang sedang berlangsung (sesuai rentang tanggal ini).</span>
         <label>Jumlah alat dipesan<input type="number" min="0" inputMode="numeric" value={f.jumlah} onChange={set_('jumlah')} placeholder="mis. 150" /></label>
         {!edit && (
           <>
@@ -1189,7 +1197,7 @@ function Admin() {
         return (
           <div className="card" key={r.id}>
             <div className="row"><b>{r.nama}</b><span className={'badge' + (r.arsip ? '' : cls)}>{r.arsip ? '🗄️ Arsip' : lbl}</span></div>
-            {aktifId === r.id && <span className="muted fine">⭐ Acara aktif: QR stiker receiver (tanpa ID acara) mengarah ke sini.</span>}
+            {aktifId === r.id && <span className="muted fine">⭐ Acara cadangan: dipakai QR stiker bila tidak ada acara yang sedang berlangsung.</span>}
             <span className="muted">{jadwalText(r)}{r.jumlah != null ? ` · ${r.jumlah} alat dipesan` : ''}</span>
             <span className="muted fine">Link tamu: {linkTamu(r.id)}</span>
             <div className="actions">
@@ -1199,8 +1207,8 @@ function Admin() {
               <button className="btn" onClick={() => setJamId(jamId === r.id ? '' : r.id)}>🪪 Jaminan</button>
               <button className="btn" onClick={() => setQrId(qrId === r.id ? '' : r.id)}>QR</button>
               <a className="btn" href={'#/cetak/' + r.id}>🏷️ Label</a>
-              <button className="btn" onClick={() => { setEdit(r.id); setF({ ...NEW(), nama: r.nama, tanggal: r.tanggal, mulai: r.mulai, selesai: r.selesai, jumlah: r.jumlah != null ? String(r.jumlah) : '' }); scrollTo(0, 0); }}>Ubah</button>
-              {aktifId !== r.id && !r.arsip && <button className="btn" onClick={() => jadikanAktif(r)}>⭐ Jadikan acara aktif</button>}
+              <button className="btn" onClick={() => { setEdit(r.id); setF({ ...NEW(), nama: r.nama, tanggal: r.tanggal, tanggalSelesai: tglAkhir(r), mulai: r.mulai, selesai: r.selesai, jumlah: r.jumlah != null ? String(r.jumlah) : '' }); scrollTo(0, 0); }}>Ubah</button>
+              {aktifId !== r.id && !r.arsip && <button className="btn" onClick={() => jadikanAktif(r)}>⭐ Jadikan acara cadangan</button>}
               <button className="btn" onClick={() => arsipkan(r)}>{r.arsip ? '↩ Buka arsip' : '🗄️ Arsipkan'}</button>
               <button className="link danger" onClick={() => hapus(r)}>Hapus</button>
             </div>
