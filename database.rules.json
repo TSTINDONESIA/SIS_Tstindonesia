@@ -29,6 +29,11 @@
           ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())"
         }
       },
+      "aktifAcara": {
+        ".read": "auth!=null",
+        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+        ".validate": "newData.isString()&&newData.val().matches(/^[a-z0-9-]{1,30}$/)"
+      },
       "pinjam": {
         ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
         ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",

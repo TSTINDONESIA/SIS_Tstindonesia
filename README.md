@@ -73,3 +73,13 @@ Tiap acara/ruangan adalah satu unit yang dibuat, dipakai, lalu diarsipkan. Tidak
 **Acara utama (lama)** sekarang juga dibatasi: hanya Super Admin dan Usher di *Daftar Usher* acara utama. Saat Super Admin pertama kali membuka `#/admin`, Usher yang sudah ada di daftar itu otomatis ditugaskan, jadi tidak ada yang terkunci.
 
 **PENTING**: tempel ulang `database.rules.json` (ada node baru `tugas`, `stok`, field `arsip`, `jumlah`) lalu Publish. Buka `#/admin` sekali sebagai Super Admin setelah update untuk sinkron penugasan.
+
+## Tanpa "Acara utama" (v1.7) - project berikutnya
+Konsep **Acara utama (default)** sudah dihapus. Semua acara dibuat dari **Super Admin (`#/admin`) -> Buat acara**.
+- **`#/usher`** sekarang halaman *pilih acara*. Usher yang hanya punya satu acara langsung masuk ke dashboard acara itu.
+- **Acara aktif (⭐)**: satu acara ditandai aktif (acara pertama otomatis). QR stiker receiver yang lama/umum (`#/?no=A001`) dan alamat `#/` otomatis diarahkan ke acara aktif, jadi stiker di 170 receiver tidak perlu dicetak ulang. Ganti dengan tombol **⭐ Jadikan acara aktif** di tiap acara.
+- **Salin pengaturan dari acara** bawaannya acara terakhir (teknisi, teks pengingat, channel, jaminan, opsional petugas).
+- **Data acara lama**: bila masih ada sisa data acara utama, panel Super Admin menampilkan kartu **Data acara lama** -> *Buka & unduh laporan* (`#/usher/_`), lalu *Hapus data lama* (ketik HAPUS). Setelah terhapus, kartu itu hilang.
+- Cetak label: `#/cetak/<id-acara>` (tombol 🏷️ Label per acara). ID acara dikosongkan = QR mengikuti acara aktif.
+
+**PENTING**: tempel ulang `database.rules.json` (ada node baru `aktifAcara`) lalu Publish.

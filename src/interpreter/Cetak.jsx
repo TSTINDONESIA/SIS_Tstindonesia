@@ -81,7 +81,7 @@ export default function Cetak() {
   const [dari, setDari] = useState(1);
   const [sampai, setSampai] = useState(100);
   const [base, setBase] = useState(baseDefault);
-  const [rid, setRid] = useState('');
+  const [rid, setRid] = useState(() => (location.hash.match(/^#\/cetak\/([a-z0-9-]{1,30})/) || [])[1] || '');
   const [mode, setMode] = useState('a4');
   const [w, setW] = useState(30);
   const [h, setH] = useState(35);
@@ -178,10 +178,10 @@ export default function Cetak() {
           <input value={base} onChange={(e) => setBase(e.target.value)} inputMode="url" autoCapitalize="none" autoCorrect="off" spellCheck={false} />
         </label>
         <span className="muted fine">Pastikan alamat ini adalah alamat GitHub Pages yang akan dipakai tetap. Kalau alamat berubah, stiker yang sudah ditempel tidak bisa dipakai.</span>
-        <label>ID ruangan (opsional)
-          <input value={rid} onChange={(e) => setRid(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30))} placeholder="kosong = acara utama" />
+        <label>ID acara (opsional)
+          <input value={rid} onChange={(e) => setRid(e.target.value.toLowerCase().replace(/[^a-z0-9-]/g, '').slice(0, 30))} placeholder="kosong = ikut acara aktif" />
         </label>
-        <span className="muted fine">Kosongkan agar stiker bisa dipakai lintas acara. Isi hanya bila stiker khusus satu ruangan.</span>
+        <span className="muted fine">Kosongkan agar stiker bisa dipakai ulang di acara berikutnya: QR otomatis mengikuti acara yang ditandai aktif oleh Super Admin. Isi hanya bila stiker khusus satu acara.</span>
         <code className="urlpreview">{qrIsi(base, contoh, rid)}</code>
       </div>
 
