@@ -96,7 +96,7 @@
         ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
         "$rcv": {
           ".write": "(auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists()))||(auth!=null&&(!data.exists()||!root.child('interpreter/pinjam/'+data.val()).exists()||root.child('interpreter/pinjam/'+data.val()+'/status').val()==='kembali'))",
-          ".validate": "$rcv.matches(/^[A-Z0-9-]{1,8}$/)&&newData.isString()&&root.child('interpreter/pinjam/'+newData.val()+'/status').val()==='dipinjam'&&root.child('interpreter/pinjam/'+newData.val()+'/kunci').val()===$rcv"
+          ".validate": "$rcv.matches(/^[A-Z0-9-]{1,8}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).child('status').val()==='dipinjam'&&newData.parent().parent().child('pinjam').child(newData.val()).child('kunci').val()===$rcv"
         }
       },
       "nilai": {
@@ -202,7 +202,7 @@
             ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
             "$rcv": {
               ".write": "(auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists()))||(auth!=null&&(!data.exists()||!root.child('interpreter/rooms/'+$rid+'/pinjam/'+data.val()).exists()||root.child('interpreter/rooms/'+$rid+'/pinjam/'+data.val()+'/status').val()==='kembali'))",
-              ".validate": "$rcv.matches(/^[A-Z0-9-]{1,8}$/)&&newData.isString()&&root.child('interpreter/rooms/'+$rid+'/pinjam/'+newData.val()+'/status').val()==='dipinjam'&&root.child('interpreter/rooms/'+$rid+'/pinjam/'+newData.val()+'/kunci').val()===$rcv"
+              ".validate": "$rcv.matches(/^[A-Z0-9-]{1,8}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).child('status').val()==='dipinjam'&&newData.parent().parent().child('pinjam').child(newData.val()).child('kunci').val()===$rcv"
             }
           },
           "nilai": {
