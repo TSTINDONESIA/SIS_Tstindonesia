@@ -36,16 +36,27 @@ const beep = () => {
   try {
     const c = getCtx();
     if (c) {
-      const o = c.createOscillator(), g = c.createGain();
-      o.type = 'square'; o.frequency.value = 1800;
-      g.gain.setValueAtTime(0.0001, c.currentTime);
-      g.gain.exponentialRampToValueAtTime(0.35, c.currentTime + 0.01);
-      g.gain.exponentialRampToValueAtTime(0.0001, c.currentTime + 0.16);
-      o.connect(g); g.connect(c.destination);
-      o.start(); o.stop(c.currentTime + 0.18);
+      const t0 = c.currentTime;
+      // Kompresor + gain maksimum supaya bunyi sekeras mungkin tanpa pecah
+      const comp = c.createDynamicsCompressor();
+      const master = c.createGain();
+      master.gain.value = 1;
+      comp.connect(master); master.connect(c.destination);
+      // Dua nada pendek (naik) = "bip-biip" yang jelas terdengar
+      [[1500, 0], [2200, 0.14]].forEach(([f, d]) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'square'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t0 + d);
+        g.gain.exponentialRampToValueAtTime(1, t0 + d + 0.01);
+        g.gain.setValueAtTime(1, t0 + d + 0.10);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.13);
+        o.connect(g); g.connect(comp);
+        o.start(t0 + d); o.stop(t0 + d + 0.14);
+      });
     }
   } catch { /* */ }
-  try { navigator.vibrate && navigator.vibrate(60); } catch { /* */ }
+  // Getar: pola panjang-pendek (Android; iPhone/Safari tidak mendukung vibrate)
+  try { navigator.vibrate && navigator.vibrate([200, 60, 200]); } catch { /* */ }
 };
 
 const S = {
