@@ -2,6 +2,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { onAuthStateChanged, signInAnonymously, signInWithEmailAndPassword, signOut } from 'firebase/auth';
 import { ref, onValue, update, push, remove, get, set, serverTimestamp } from 'firebase/database';
 import QRCode from 'qrcode';
+import Cetak from './Cetak.jsx';
 import { auth, db } from '../firebase.js';
 import { waLink, waNum, fmtJam, fmtTgl, DEFAULT_PESAN, pilihPesan, salamWaktu, contactLink, isEmail, rcvNorm, rcvKey, RCV_OK, basePath, slug, statusRuang, jadwalText, JAMINAN, JAMINAN_DEFAULT, jaminanInfo } from './util.js';
 
@@ -704,6 +705,7 @@ function Dashboard({ user, rid, isSuper, myKey }) {
             {boleh.map((r) => <option key={r.id} value={r.id}>{r.nama} · {r.tanggal} {r.mulai}{r.arsip ? ' (arsip)' : ''}</option>)}
           </select>
           {isSuper && <a className="link" href="#/admin">⚙️ Kelola ruangan</a>}
+          <a className="link" href="#/cetak">🏷️ Cetak label</a>
         </div>
       )}
 
@@ -1064,6 +1066,7 @@ function Admin() {
         <h3>Acara utama (default)</h3>
         <p className="muted">Alamat lama <b>#/</b> dan <b>#/usher</b>. Data tetap seperti semula.</p>
         <a className="btn" href="#/usher">Buka dashboard acara utama</a>
+        <a className="btn" href="#/cetak">🏷️ Cetak label QR receiver</a>
         <label>Jumlah alat dipesan<input type="number" min="0" inputMode="numeric" value={jumMain} onChange={(e) => setJumMain(e.target.value)} /></label>
         <button className="btn" onClick={simpanJumMain}>Simpan jumlah alat</button>
         <span className="muted fine">Petugas acara utama = Daftar Usher di dashboard acara utama → Pengaturan.</span>
@@ -1155,6 +1158,7 @@ export default function Usher({ hash = '#/usher' }) {
   if (user === undefined) return <div className="wrap"><p className="muted center">Memuat…</p></div>;
   if (!user || ok === false) return <Login onOk={() => setVer((v) => v + 1)} />;
   if (ok === null) return <div className="wrap"><p className="muted center">Memeriksa akses…</p></div>;
+  if (hash.startsWith('#/cetak')) return <Cetak />;
   if (modeAdmin) {
     return isSuper ? <Admin /> : (
       <div className="wrap"><div className="card center"><div className="big">🔒</div>

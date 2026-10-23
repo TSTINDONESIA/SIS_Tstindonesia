@@ -132,7 +132,9 @@ export default function Guest({ rid = '' }) {
   const [ready, setReady] = useState(false);
   const [cfg, setCfg] = useState({});
   const [cfgOk, setCfgOk] = useState(false);
-  const [f, setF] = useState({ nama: '', hp: '', institusi: '', receiver: '', jaminan: '' });
+  // QR di stiker alat: #/?no=A001 atau #/r/<ruangan>?no=A001 -> nomor receiver terisi otomatis
+  const noQr = () => { try { return rcvNorm(new URLSearchParams(location.hash.split('?')[1] || '').get('no') || ''); } catch { return ''; } };
+  const [f, setF] = useState(() => ({ nama: '', hp: '', institusi: '', receiver: noQr(), jaminan: '' }));
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState('');
   const [loans, setLoans] = useState(loadLoans);   // semua alat milik tamu ini
