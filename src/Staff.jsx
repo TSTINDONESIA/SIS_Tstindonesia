@@ -24,7 +24,10 @@ export function useSesi() {
     const hp = normHp(raw);
     if (!hp) throw new Error('Nomor HP tidak valid. Contoh: 0812 3456 7890');
     try { await set(ref(db, 'sis/sesi/' + s.uid), hp); }
-    catch { throw new Error('Nomor ini belum terdaftar. Minta Super Admin memasukkan nomor Anda ke daftar petugas acara.'); }
+    catch (e) {
+      if (e && e.code === 'PERMISSION_DENIED') throw new Error('Nomor ini belum terdaftar. Minta Super Admin memasukkan nomor Anda ke daftar petugas acara. (Jika Anda Super Admin: cek sis/superDaftar/' + hp + ' = true dan Rules sudah di-Publish.)');
+      throw new Error('Gagal masuk (' + ((e && (e.code || e.message)) || 'tidak diketahui') + '). Cek internet, lalu coba lagi.');
+    }
     await muat();
   };
   const logout = async () => { try { await remove(ref(db, 'sis/sesi/' + s.uid)); } catch {} await muat(); };
