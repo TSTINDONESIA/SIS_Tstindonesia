@@ -141,29 +141,23 @@ export function Scanner({ onCode, hint, error }) {
           let text = null;
           if (v.readyState >= 2 && v.videoWidth) {
             try {
+              // Baca hanya area di dalam bingkai (±70% tengah layar, dipersempit oleh zoom digital),
+              // supaya QR tetangga yang terpotong di tepi tidak mengacaukan pembacaan.
               const z = zref.current;
-              const digital = !z.r.hw && z.v > 1.01;
-              if (det && !digital) {
-                const r = await det.detect(v);
+              const dz = !z.r.hw && z.v > 1.01 ? z.v : 1;
+              const vw = v.videoWidth, vh = v.videoHeight;
+              const side = (Math.min(vw, vh) / dz) * 0.7;
+              const sx = (vw - side) / 2, sy = (vh - side) / 2;
+              const out = Math.round(Math.min(side, 720));
+              cv.width = out; cv.height = out;
+              cx.drawImage(v, sx, sy, side, side, 0, 0, out, out);
+              if (det) {
+                const r = await det.detect(cv);
                 if (r && r[0]) text = r[0].rawValue;
               } else {
-                // Crop tengah frame sesuai zoom digital, lalu decode
-                const vw = v.videoWidth, vh = v.videoHeight;
-                const side = digital ? Math.min(vw, vh) / z.v : 0;
-                const sw = digital ? side : vw, sh = digital ? side : vh;
-                const sx = (vw - sw) / 2, sy = (vh - sh) / 2;
-                const sc = Math.min(1, 800 / sw);
-                cv.width = Math.round(sw * sc);
-                cv.height = Math.round(sh * sc);
-                cx.drawImage(v, sx, sy, sw, sh, 0, 0, cv.width, cv.height);
-                if (det) {
-                  const r = await det.detect(cv);
-                  if (r && r[0]) text = r[0].rawValue;
-                } else {
-                  const d = cx.getImageData(0, 0, cv.width, cv.height);
-                  const q = jsQR(d.data, d.width, d.height, { inversionAttempts: 'dontInvert' });
-                  if (q) text = q.data;
-                }
+                const d = cx.getImageData(0, 0, out, out);
+                const q = jsQR(d.data, d.width, d.height, { inversionAttempts: 'attemptBoth' });
+                if (q) text = q.data;
               }
             } catch { /* abaikan frame yang gagal */ }
           }
@@ -176,7 +170,7 @@ export function Scanner({ onCode, hint, error }) {
             }
             last.at = now;
           }
-          timer = setTimeout(tick, 140);
+          timer = setTimeout(tick, 90);
         };
         tick();
       } catch (e) {
