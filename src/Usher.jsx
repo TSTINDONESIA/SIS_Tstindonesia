@@ -378,6 +378,7 @@ function Pengaturan({ eid, meta, cfg, loans, logs, diterima, nilaiRata }) {
 export function Dashboard({ eid, sesi }) {
   const { hp, uid } = sesi;
   const b = `sis/acara/${eid}`;
+  const bs = `acara/${eid}`;   // relatif terhadap ref(db,'sis'), dipakai untuk update() multi-path
   const [meta, setMeta] = useState(undefined);
   const [cfg, setCfg] = useState({});
   const [status, setStatus] = useState(undefined);
@@ -453,10 +454,10 @@ export function Dashboard({ eid, sesi }) {
   async function kembalikan(items) {
     const upd = {};
     items.forEach((l) => {
-      upd[`${b}/pinjam/${l.id}/status`] = 'kembali';
-      upd[`${b}/pinjam/${l.id}/kembaliWaktu`] = serverTimestamp();
-      upd[`${b}/pinjam/${l.id}/kembaliOleh`] = nama;
-      if (!l.grup && l.hp) upd[`${b}/pinjam/${l.id}/grup`] = grupKey(l.hp); // data lama tanpa 'grup' gagal validasi Rules
+      upd[`${bs}/pinjam/${l.id}/status`] = 'kembali';
+      upd[`${bs}/pinjam/${l.id}/kembaliWaktu`] = serverTimestamp();
+      upd[`${bs}/pinjam/${l.id}/kembaliOleh`] = nama;
+      if (!l.grup && l.hp) upd[`${bs}/pinjam/${l.id}/grup`] = grupKey(l.hp); // data lama tanpa 'grup' gagal validasi Rules
     });
     await kunciBersih(upd, items);
     await update(ref(db, 'sis'), upd);
@@ -466,12 +467,12 @@ export function Dashboard({ eid, sesi }) {
     if (k.exists()) throw new Error(`${baru} sedang dipinjam.`);
     try {
       const upd = {
-        [`${b}/pinjam/${l.id}/receiver`]: baru,
-        [`${b}/pinjam/${l.id}/unitAsal`]: l.unitAsal || l.receiver,
-        [`${b}/pinjam/${l.id}/catatanGanti`]: `Tukar ${l.receiver} ke ${baru} oleh ${nama}`.slice(0, 200),
+        [`${bs}/pinjam/${l.id}/receiver`]: baru,
+        [`${bs}/pinjam/${l.id}/unitAsal`]: l.unitAsal || l.receiver,
+        [`${bs}/pinjam/${l.id}/catatanGanti`]: `Tukar ${l.receiver} ke ${baru} oleh ${nama}`.slice(0, 200),
         [`unitAktif/${baru}`]: { acara: eid, loan: l.id },
       };
-      if (!l.grup && l.hp) upd[`${b}/pinjam/${l.id}/grup`] = grupKey(l.hp);
+      if (!l.grup && l.hp) upd[`${bs}/pinjam/${l.id}/grup`] = grupKey(l.hp);
       await kunciBersih(upd, [l]);
       await update(ref(db, 'sis'), upd);
     } catch { throw new Error('Gagal menukar. Periksa nomor pengganti.'); }
@@ -487,13 +488,13 @@ export function Dashboard({ eid, sesi }) {
   async function acaraSelesai() {
     const upd = {};
     buka.forEach((l) => {
-      upd[`${b}/pinjam/${l.id}/status`] = 'tidakKembali';
-      if (!l.grup && l.hp) upd[`${b}/pinjam/${l.id}/grup`] = grupKey(l.hp);
+      upd[`${bs}/pinjam/${l.id}/status`] = 'tidakKembali';
+      if (!l.grup && l.hp) upd[`${bs}/pinjam/${l.id}/grup`] = grupKey(l.hp);
     });
     await kunciBersih(upd, buka);
-    upd[`${b}/status`] = 'selesai';
+    upd[`${bs}/status`] = 'selesai';
     const id = push(ref(db, b + '/stok/log')).key;
-    upd[`${b}/stok/log/${id}`] = { jenis: 'selesai', jumlah: 0, oleh: nama, waktu: serverTimestamp(), catatan: buka.length ? `${buka.length} receiver belum kembali saat acara ditutup` : '' };
+    upd[`${bs}/stok/log/${id}`] = { jenis: 'selesai', jumlah: 0, oleh: nama, waktu: serverTimestamp(), catatan: buka.length ? `${buka.length} receiver belum kembali saat acara ditutup` : '' };
     await update(ref(db, 'sis'), upd);
     setKonfSelesai(false);
   }
@@ -515,7 +516,7 @@ export function Dashboard({ eid, sesi }) {
     const teks = isiPesan(cfg.pesan, { salam: salamWaktu(), nama: g.nama, acara: meta.nama, no: b2.map((l) => l.receiver).join(', ') });
     window.open(contactLink(g.hp, teks, 'Pengembalian receiver ' + meta.nama), '_blank');
     const upd = {};
-    b2.forEach((l) => { upd[`${b}/pinjam/${l.id}/reminderTerakhir`] = Date.now(); upd[`${b}/pinjam/${l.id}/reminderJumlah`] = (l.reminderJumlah || 0) + 1; });
+    b2.forEach((l) => { upd[`${bs}/pinjam/${l.id}/reminderTerakhir`] = Date.now(); upd[`${bs}/pinjam/${l.id}/reminderJumlah`] = (l.reminderJumlah || 0) + 1; });
     try { await update(ref(db, 'sis'), upd); } catch {}
   };
 
