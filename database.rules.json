@@ -2,171 +2,206 @@
   "rules": {
     ".read": false,
     ".write": false,
-    "interpreter": {
+    "sis": {
       ".read": false,
       ".write": false,
-      "usher": {
+      "sesi": {
         "$uid": {
           ".read": "auth!=null&&auth.uid===$uid",
-          ".write": "auth!=null&&auth.uid===$uid&&(!newData.exists()||(newData.isString()&&root.child('interpreter/usherDaftar/'+newData.val()).exists()))"
+          ".write": "auth!=null&&auth.uid===$uid&&(!newData.exists()||(newData.isString()&&newData.val().matches(/^62[0-9]{8,13}$/)&&(root.child('sis/nomor/'+newData.val()).exists()||root.child('sis/superDaftar/'+newData.val()).exists())))"
         }
       },
-      "usherDaftar": {
-        ".read": false,
-        "$key": {
+      "nomor": {
+        "$hp": {
           ".read": "auth!=null",
-          ".write": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
-          ".validate": "$key.matches(/^62[0-9]{8,13}$/)&&newData.isString()&&newData.val().length>0&&newData.val().length<=80"
+          ".write": "auth!=null&&root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()",
+          ".validate": "$hp.matches(/^62[0-9]{8,13}$/)&&newData.val()===true"
         }
       },
-      "config": {
-        ".read": "auth!=null",
-        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-        "teknisi": {
-          ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())"
-        },
-        "channels": {
-          ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())"
+      "superDaftar": {
+        "$hp": {
+          ".read": "auth!=null",
+          ".write": false
         }
       },
-      "aktifAcara": {
-        ".read": "auth!=null",
-        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-        ".validate": "newData.isString()&&newData.val().matches(/^[a-z0-9-]{1,30}$/)"
+      "indeks": {
+        ".read": "auth!=null&&root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()",
+        "$eid": {
+          ".write": "auth!=null&&root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()",
+          ".validate": "$eid.matches(/^[a-z0-9]{4,12}$/)&&newData.val()===true"
+        }
       },
-      "pinjam": {
-        ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
-        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
-        "$id": {
-          ".read": "auth!=null&&data.child('uid').val()===auth.uid",
-          ".write": "(auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists()))||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.child('uid').val()===auth.uid&&newData.parent().parent().child('aktif').child(newData.child('kunci').val()).val()===$id&&root.child('interpreter/config/arsip').val()!==true)",
-          ".validate": "newData.hasChildren(['nama','hp','institusi','receiver','waktu','status'])",
-          "nama": {
-            ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=80"
+      "tugas": {
+        ".read": "auth!=null&&root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()",
+        "$hp": {
+          ".read": "auth!=null&&root.child('sis/sesi/'+auth.uid).val()===$hp",
+          ".write": "auth!=null&&root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()",
+          "$eid": {
+            ".validate": "$eid.matches(/^[a-z0-9]{4,12}$/)&&newData.val()===true"
+          }
+        }
+      },
+      "unitAktif": {
+        ".read": "auth!=null",
+        "$unit": {
+          ".write": "auth!=null&&((!data.exists()&&newData.exists()&&root.child('sis/acara/'+newData.child('acara').val()+'/status').val()==='aktif')||(data.exists()&&!newData.exists()&&(auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+data.child('acara').val()+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists()))))",
+          ".validate": "$unit.matches(/^[A-J](00[1-9]|0[1-9][0-9]|100)$/)&&newData.hasChildren(['acara','loan'])",
+          "acara": {
+            ".validate": "newData.isString()&&newData.val().matches(/^[a-z0-9]{4,12}$/)"
           },
-          "hp": {
-            ".validate": "newData.isString()&&newData.val().length<=100&&(newData.val().matches(/^[0-9+ -]{6,20}$/)||newData.val().matches(/^[^@ ]+@[^@ ]+[.][^@ ]+$/))"
-          },
-          "institusi": {
-            ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=100"
-          },
-          "receiver": {
-            ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,8}$/)"
-          },
-          "waktu": {
-            ".validate": "newData.val()===now"
-          },
-          "status": {
-            ".validate": "newData.val()==='dipinjam'||newData.val()==='kembali'"
-          },
-          "kembaliWaktu": {
-            ".validate": "newData.isNumber()"
-          },
-          "reminderTerakhir": {
-            ".validate": "newData.isNumber()"
-          },
-          "reminderJumlah": {
-            ".validate": "newData.isNumber()"
-          },
-          "uid": {
-            ".validate": "newData.isString()&&newData.val().length<=64"
-          },
-          "catatanGanti": {
-            ".validate": "newData.isString()&&newData.val().length<=200"
-          },
-          "kunci": {
-            ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,8}$/)"
-          },
-          "jaminan": {
-            ".validate": "newData.isString()&&newData.val().matches(/^[a-z]{2,12}$/)"
-          },
-          "kembaliOleh": {
-            ".validate": "newData.isString()&&newData.val().length<=80"
-          },
-          "kembaliOlehHp": {
-            ".validate": "newData.isString()&&newData.val().length<=20"
+          "loan": {
+            ".validate": "newData.isString()&&newData.val().length>=1&&newData.val().length<=40"
           },
           "$other": {
             ".validate": false
           }
         }
       },
-      "aktif": {
-        ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
-        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
-        "$rcv": {
-          ".write": "(auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists()))||(auth!=null&&(!data.exists()||!root.child('interpreter/pinjam/'+data.val()).exists()||root.child('interpreter/pinjam/'+data.val()+'/status').val()==='kembali'))",
-          ".validate": "$rcv.matches(/^[A-Z0-9-]{1,8}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).child('status').val()==='dipinjam'&&newData.parent().parent().child('pinjam').child(newData.val()).child('kunci').val()===$rcv"
-        }
-      },
-      "nilai": {
-        ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
-        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
-        "$id": {
-          ".read": "auth!=null&&data.child('uid').val()===auth.uid",
-          ".write": "auth!=null&&!data.exists()&&newData.child('uid').val()===auth.uid&&root.child('interpreter/pinjam/'+$id+'/uid').val()===auth.uid&&root.child('interpreter/pinjam/'+$id+'/status').val()==='kembali'",
-          ".validate": "newData.hasChildren(['pelayanan','alat','uid','waktu'])",
-          "pelayanan": {
-            ".validate": "newData.isNumber()&&newData.val()>=1&&newData.val()<=5&&newData.val()%1===0"
+      "acara": {
+        "$eid": {
+          ".validate": "$eid.matches(/^[a-z0-9]{4,12}$/)",
+          ".write": "auth!=null&&root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()",
+          "meta": {
+            ".read": "auth!=null",
+            ".write": "auth!=null&&root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()",
+            ".validate": "newData.hasChildren(['nama','tanggal','mulai','selesai'])",
+            "nama": {
+              ".validate": "newData.isString()&&newData.val().length>=1&&newData.val().length<=80"
+            },
+            "tanggal": {
+              ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
+            },
+            "mulai": {
+              ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{2}:[0-9]{2}$/)"
+            },
+            "selesai": {
+              ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{2}:[0-9]{2}$/)"
+            },
+            "dipesan": {
+              ".validate": "newData.isNumber()&&newData.val()>=0&&newData.val()<=100000&&newData.val()%1===0"
+            },
+            "dibuat": {
+              ".validate": "newData.isNumber()"
+            },
+            "$other": {
+              ".validate": false
+            }
           },
-          "alat": {
-            ".validate": "newData.isNumber()&&newData.val()>=1&&newData.val()<=5&&newData.val()%1===0"
-          },
-          "komentar": {
-            ".validate": "newData.isString()&&newData.val().length<=300"
-          },
-          "uid": {
-            ".validate": "newData.isString()&&newData.val().length<=64"
-          },
-          "waktu": {
-            ".validate": "newData.val()===now"
-          },
-          "$other": {
-            ".validate": false
-          }
-        }
-      },
-      "rooms": {
-        ".read": false,
-        ".write": false,
-        "$rid": {
           "config": {
             ".read": "auth!=null",
-            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-            "teknisi": {
-              ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())"
+            ".write": "auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())",
+            "jaminan": {
+              "aktif": {
+                ".validate": "newData.isBoolean()"
+              },
+              "jenis": {
+                "$j": {
+                  ".validate": "$j.matches(/^[a-z]{2,12}$/)&&newData.isBoolean()"
+                }
+              },
+              "$other": {
+                ".validate": false
+              }
+            },
+            "teknisiNama": {
+              ".validate": "newData.isString()&&newData.val().length>=0&&newData.val().length<=60"
+            },
+            "teknisiWa": {
+              ".validate": "newData.isString()&&newData.val().length>=0&&newData.val().length<=20"
+            },
+            "pesan": {
+              ".validate": "newData.isString()&&newData.val().length>=0&&newData.val().length<=500"
             },
             "channels": {
-              ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())"
+              "$c": {
+                "nama": {
+                  ".validate": "newData.isString()&&newData.val().length>=1&&newData.val().length<=40"
+                },
+                "no": {
+                  ".validate": "newData.isString()&&newData.val().length>=1&&newData.val().length<=8"
+                },
+                "$other": {
+                  ".validate": false
+                }
+              }
+            },
+            "$other": {
+              ".validate": false
+            }
+          },
+          "status": {
+            ".read": "auth!=null",
+            ".write": "auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())",
+            ".validate": "newData.val()==='aktif'||newData.val()==='selesai'"
+          },
+          "petugas": {
+            ".read": "auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())",
+            ".write": "auth!=null&&root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()",
+            "$hp": {
+              ".validate": "$hp.matches(/^62[0-9]{8,13}$/)&&newData.isString()&&newData.val().length>=1&&newData.val().length<=80"
+            }
+          },
+          "petugasAktif": {
+            ".read": "auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())",
+            "$hp": {
+              ".write": "auth!=null&&root.child('sis/sesi/'+auth.uid).val()===$hp&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())&&root.child('sis/acara/'+$eid+'/status').val()==='aktif'",
+              ".validate": "$hp.matches(/^62[0-9]{8,13}$/)&&newData.hasChildren(['nama','waktu'])",
+              "nama": {
+                ".validate": "newData.isString()&&newData.val().length>=1&&newData.val().length<=80"
+              },
+              "waktu": {
+                ".validate": "newData.val()===now"
+              },
+              "$other": {
+                ".validate": false
+              }
             }
           },
           "pinjam": {
-            ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+            ".read": "auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())",
+            ".write": "auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())",
             "$id": {
               ".read": "auth!=null&&data.child('uid').val()===auth.uid",
-              ".write": "(auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists()))||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.child('uid').val()===auth.uid&&newData.parent().parent().child('aktif').child(newData.child('kunci').val()).val()===$id&&root.child('interpreter/rooms/'+$rid+'/config/arsip').val()!==true)",
-              ".validate": "newData.hasChildren(['nama','hp','institusi','receiver','waktu','status'])",
+              ".write": "(auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists()))||(auth!=null&&!data.exists()&&newData.child('status').val()==='dipinjam'&&newData.child('uid').val()===auth.uid&&root.child('sis/acara/'+$eid+'/status').val()==='aktif'&&!root.child('sis/unitAktif/'+newData.child('receiver').val()).exists())",
+              ".validate": "newData.hasChildren(['nama','hp','institusi','receiver','waktu','status','uid','grup'])",
               "nama": {
-                ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=80"
+                ".validate": "newData.isString()&&newData.val().length>=1&&newData.val().length<=80"
               },
               "hp": {
                 ".validate": "newData.isString()&&newData.val().length<=100&&(newData.val().matches(/^[0-9+ -]{6,20}$/)||newData.val().matches(/^[^@ ]+@[^@ ]+[.][^@ ]+$/))"
               },
               "institusi": {
-                ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=100"
+                ".validate": "newData.isString()&&newData.val().length>=1&&newData.val().length<=100"
               },
               "receiver": {
-                ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,8}$/)"
+                ".validate": "newData.isString()&&newData.val().matches(/^[A-J](00[1-9]|0[1-9][0-9]|100)$/)"
+              },
+              "unitAsal": {
+                ".validate": "newData.isString()&&newData.val().matches(/^[A-J](00[1-9]|0[1-9][0-9]|100)$/)"
               },
               "waktu": {
                 ".validate": "newData.val()===now"
               },
               "status": {
-                ".validate": "newData.val()==='dipinjam'||newData.val()==='kembali'"
+                ".validate": "newData.val()==='dipinjam'||newData.val()==='kembali'||newData.val()==='tidakKembali'"
+              },
+              "uid": {
+                ".validate": "newData.isString()&&newData.val().length<=64"
+              },
+              "grup": {
+                ".validate": "newData.isString()&&newData.val().length>=1&&newData.val().length<=100"
+              },
+              "jaminan": {
+                ".validate": "newData.isString()&&newData.val().matches(/^[a-z]{2,12}$/)"
+              },
+              "catatanGanti": {
+                ".validate": "newData.isString()&&newData.val().length>=0&&newData.val().length<=200"
               },
               "kembaliWaktu": {
                 ".validate": "newData.isNumber()"
+              },
+              "kembaliOleh": {
+                ".validate": "newData.isString()&&newData.val().length>=0&&newData.val().length<=80"
               },
               "reminderTerakhir": {
                 ".validate": "newData.isNumber()"
@@ -174,44 +209,18 @@
               "reminderJumlah": {
                 ".validate": "newData.isNumber()"
               },
-              "uid": {
-                ".validate": "newData.isString()&&newData.val().length<=64"
-              },
-              "catatanGanti": {
-                ".validate": "newData.isString()&&newData.val().length<=200"
-              },
-              "kunci": {
-                ".validate": "newData.isString()&&newData.val().matches(/^[A-Z0-9-]{1,8}$/)"
-              },
-              "jaminan": {
-                ".validate": "newData.isString()&&newData.val().matches(/^[a-z]{2,12}$/)"
-              },
-              "kembaliOleh": {
-                ".validate": "newData.isString()&&newData.val().length<=80"
-              },
-              "kembaliOlehHp": {
-                ".validate": "newData.isString()&&newData.val().length<=20"
-              },
               "$other": {
                 ".validate": false
               }
             }
           },
-          "aktif": {
-            ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-            "$rcv": {
-              ".write": "(auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists()))||(auth!=null&&(!data.exists()||!root.child('interpreter/rooms/'+$rid+'/pinjam/'+data.val()).exists()||root.child('interpreter/rooms/'+$rid+'/pinjam/'+data.val()+'/status').val()==='kembali'))",
-              ".validate": "$rcv.matches(/^[A-Z0-9-]{1,8}$/)&&newData.isString()&&newData.parent().parent().child('pinjam').child(newData.val()).child('status').val()==='dipinjam'&&newData.parent().parent().child('pinjam').child(newData.val()).child('kunci').val()===$rcv"
-            }
-          },
           "nilai": {
-            ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-            "$id": {
-              ".read": "auth!=null&&data.child('uid').val()===auth.uid",
-              ".write": "auth!=null&&!data.exists()&&newData.child('uid').val()===auth.uid&&root.child('interpreter/rooms/'+$rid+'/pinjam/'+$id+'/uid').val()===auth.uid&&root.child('interpreter/rooms/'+$rid+'/pinjam/'+$id+'/status').val()==='kembali'",
-              ".validate": "newData.hasChildren(['pelayanan','alat','uid','waktu'])",
+            ".read": "auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())",
+            ".write": "auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())",
+            "$uid": {
+              ".read": "auth!=null&&$uid===auth.uid",
+              ".write": "(auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists()))||(auth!=null&&auth.uid===$uid&&!data.exists())",
+              ".validate": "newData.hasChildren(['pelayanan','alat','waktu'])",
               "pelayanan": {
                 ".validate": "newData.isNumber()&&newData.val()>=1&&newData.val()<=5&&newData.val()%1===0"
               },
@@ -219,10 +228,7 @@
                 ".validate": "newData.isNumber()&&newData.val()>=1&&newData.val()<=5&&newData.val()%1===0"
               },
               "komentar": {
-                ".validate": "newData.isString()&&newData.val().length<=300"
-              },
-              "uid": {
-                ".validate": "newData.isString()&&newData.val().length<=64"
+                ".validate": "newData.isString()&&newData.val().length>=0&&newData.val().length<=300"
               },
               "waktu": {
                 ".validate": "newData.val()===now"
@@ -232,143 +238,38 @@
               }
             }
           },
-          ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-          ".validate": "$rid.matches(/^[a-z0-9-]{1,30}$/)",
           "stok": {
-            ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-            ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
+            ".read": "auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())",
+            ".write": "auth!=null&&(root.child('sis/superDaftar/'+root.child('sis/sesi/'+auth.uid).val()).exists()||root.child('sis/acara/'+$eid+'/petugas/'+root.child('sis/sesi/'+auth.uid).val()).exists())",
             "log": {
               "$id": {
                 ".validate": "newData.hasChildren(['jenis','jumlah','oleh','waktu'])",
                 "jenis": {
-                  ".validate": "newData.val()==='terima'||newData.val()==='retur'"
+                  ".validate": "newData.val()==='terima'||newData.val()==='susulan'||newData.val()==='retur'||newData.val()==='selesai'"
                 },
                 "jumlah": {
-                  ".validate": "newData.isNumber()&&newData.val()>=1&&newData.val()<=9999&&newData.val()%1===0"
+                  ".validate": "newData.isNumber()&&newData.val()>=0&&newData.val()<=9999&&newData.val()%1===0"
+                },
+                "kurang": {
+                  ".validate": "newData.isNumber()&&newData.val()>=0&&newData.val()<=9999&&newData.val()%1===0"
                 },
                 "oleh": {
-                  ".validate": "newData.isString()&&newData.val().length<=80"
+                  ".validate": "newData.isString()&&newData.val().length>=1&&newData.val().length<=80"
+                },
+                "teknisi": {
+                  ".validate": "newData.isString()&&newData.val().length>=0&&newData.val().length<=80"
                 },
                 "catatan": {
-                  ".validate": "newData.isString()&&newData.val().length<=100"
+                  ".validate": "newData.isString()&&newData.val().length>=0&&newData.val().length<=600"
                 },
                 "waktu": {
                   ".validate": "newData.val()===now"
-                },
-                "teknisi": {
-                  ".validate": "newData.isString()&&newData.val().length<=80"
                 },
                 "$other": {
                   ".validate": false
                 }
               }
             }
-          }
-        }
-      },
-      "ruangan": {
-        ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-        "$rid": {
-          ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-          ".validate": "$rid.matches(/^[a-z0-9-]{1,30}$/)&&newData.hasChildren(['nama','tanggal','mulai','selesai'])",
-          "nama": {
-            ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=60"
-          },
-          "tanggal": {
-            ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
-          },
-          "mulai": {
-            ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{2}:[0-9]{2}$/)"
-          },
-          "selesai": {
-            ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{2}:[0-9]{2}$/)"
-          },
-          "petugas": {
-            "$k": {
-              ".validate": "newData.isString()&&newData.val().length>0&&newData.val().length<=80"
-            }
-          },
-          ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/ruangan/'+$rid+'/petugas/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-          "arsip": {
-            ".validate": "newData.val()===true"
-          },
-          "jumlah": {
-            ".validate": "newData.isNumber()&&newData.val()>=0&&newData.val()<=100000&&newData.val()%1===0"
-          },
-          "$other": {
-            ".validate": false
-          },
-          "tanggalSelesai": {
-            ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
-          }
-        }
-      },
-      "superadmin": {
-        "$uid": {
-          ".read": "auth!=null&&auth.uid===$uid",
-          ".write": false
-        }
-      },
-      "superDaftar": {
-        ".read": false,
-        "$key": {
-          ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).exists()",
-          ".write": false
-        }
-      },
-      "stok": {
-        ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
-        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists()||root.child('interpreter/tugas/'+root.child('interpreter/usher/'+auth.uid).val()+'/_').exists())",
-        "log": {
-          "$id": {
-            ".validate": "newData.hasChildren(['jenis','jumlah','oleh','waktu'])",
-            "jenis": {
-              ".validate": "newData.val()==='terima'||newData.val()==='retur'"
-            },
-            "jumlah": {
-              ".validate": "newData.isNumber()&&newData.val()>=1&&newData.val()<=9999&&newData.val()%1===0"
-            },
-            "oleh": {
-              ".validate": "newData.isString()&&newData.val().length<=80"
-            },
-            "catatan": {
-              ".validate": "newData.isString()&&newData.val().length<=100"
-            },
-            "waktu": {
-              ".validate": "newData.val()===now"
-            },
-            "teknisi": {
-              ".validate": "newData.isString()&&newData.val().length<=80"
-            },
-            "$other": {
-              ".validate": false
-            }
-          }
-        }
-      },
-      "tugas": {
-        ".read": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-        "$key": {
-          ".read": "auth!=null&&root.child('interpreter/usher/'+auth.uid).val()===$key",
-          ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-          "$rid": {
-            ".validate": "newData.val()===true&&($rid==='_'||$rid.matches(/^[a-z0-9-]{1,30}$/))"
-          }
-        }
-      },
-      "jadwalPublik": {
-        ".read": "auth!=null",
-        ".write": "auth!=null&&(root.child('interpreter/superadmin/'+auth.uid).exists()||root.child('interpreter/superDaftar/'+root.child('interpreter/usher/'+auth.uid).val()).exists())",
-        "$rid": {
-          ".validate": "$rid.matches(/^[a-z0-9-]{1,30}$/)&&newData.hasChildren(['s','e'])",
-          "s": {
-            ".validate": "newData.isNumber()"
-          },
-          "e": {
-            ".validate": "newData.isNumber()"
-          },
-          "a": {
-            ".validate": "newData.val()===true"
           },
           "$other": {
             ".validate": false

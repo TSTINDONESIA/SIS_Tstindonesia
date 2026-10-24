@@ -1,91 +1,81 @@
-# TST Interpreter Control (repo terpisah)
+# SIS / TST Interpreter Control (v2)
 
-React + Vite + Firebase (Anonymous Auth untuk tamu dan Usher; Usher dikenali dari daftar nama + nomor HP, Email/Password hanya opsional untuk admin).
-Tidak ada data atau kode Event Control di repo ini.
+Aplikasi peminjaman receiver interpreter berbasis barcode. React + Vite + Firebase Realtime Database,
+di-host di GitHub Pages. Dibuat dari nol; tidak memakai data v1 (semua data baru ada di node `sis/`).
 
-## Pasang
-1. **Firebase project BARU** (misal `tst-interpreter`) agar data benar-benar terpisah dari Event Control.
-   - Authentication -> Sign-in method: aktifkan **Anonymous** dan **Email/Password**.
-   - Realtime Database -> Create (region Singapore) -> tab Rules -> tempel `database.rules.json` -> Publish.
-   - Project settings -> Add web app -> salin config ke `src/firebaseConfig.js` (termasuk `databaseURL`).
-   - **Usher pertama (sekali saja)**: Realtime Database -> Data, tambah `interpreter/usherDaftar/628123456789` = `Nama Usher` (nomor format 62..., tanpa 0/+/spasi; nama persis seperti yang akan diketik).
-   - Setelah itu Usher masuk di `#/usher` cukup dengan **nama + nomor HP**. Usher lain ditambah dari tab Pengaturan -> Daftar Usher.
-   - (Opsional) Admin lewat email: Authentication -> Users -> Add user, lalu `interpreter/usher/<UID>` = `true`.
-2. Buat repo GitHub baru (**Private** juga bisa, Pages gratis butuh Public kecuali akun berbayar), push semua isi folder ini ke `main`.
-3. Settings -> Pages -> Source: **GitHub Actions**.
-4. Firebase -> Authentication -> Settings -> Authorized domains: tambahkan `USERNAME.github.io`.
+## Alur singkat
 
-## Alamat
-- Tamu: `https://USERNAME.github.io/REPO/#/`
-- Usher: `https://USERNAME.github.io/REPO/#/usher` (tab Pengaturan: nomor Usher, acara, batas jam, QR)
+| Siapa | Apa yang dilakukan |
+|---|---|
+| **Super Admin** (`#/admin`) | Membuat acara, menempel daftar Usher dari kontak HP, mencetak QR meja dan label barcode alat. |
+| **Usher** (`#/usher`) | Masuk dengan nomor HP, isi nama sekali per acara, terima alat dari teknisi, catat pengembalian, kembalikan ke teknisi, tutup acara. |
+| **Tamu** (`#/e/<acara>`) | Scan QR meja Usher, isi biodata sekali, lalu scan barcode receiver di dalam halaman atau ketik nomornya. Boleh meminjam banyak alat. |
 
-Lokal: `npm install` lalu `npm run dev`. Kamera/QR tamu perlu HTTPS (Pages sudah HTTPS).
+### Penentuan acara (beberapa acara bersamaan)
 
-## Fitur tambahan (v1.1)
-- **Dua bahasa (ID/EN)** di halaman tamu, tombol bahasa di atas; pilihan diingat, default mengikuti bahasa browser. Brand **TST Indonesia** tampil besar di header.
-- **Kontak tamu: nomor WhatsApp atau email.** Pengingat Usher otomatis membuka WhatsApp (nomor) atau aplikasi email (email).
-- **Tombol bantuan teknisi** di halaman tamu: satu klik langsung ke WhatsApp teknisi. Nomornya diisi Usher/Admin di `#/usher` -> Pengaturan -> *Nomor teknisi* (tersimpan di `interpreter/config/teknisi`).
-- **Penilaian singkat** (bintang pelayanan + bintang alat + komentar opsional) muncul di halaman tamu setelah Usher menekan *Sudah kembali*. Hasil + rata-rata ada di tab **Penilaian** dan ikut diunduh di CSV.
+* Setiap acara punya **QR meja** sendiri (`.../#/e/<kode-acara>`). Tamu hanya memindai QR meja Usher.
+* Di halaman tamu, nomor receiver diisi dengan **tombol Scan receiver** (kamera di dalam halaman) atau **ketik manual**.
+* **QR di alat hanya berisi nomor unit** (mis. `A001`), tanpa alamat situs dan tanpa acara. Karena itu label tidak bentrok
+  antar acara dan tidak perlu dicetak ulang kalau alamat situs berubah.
+* Acara ditentukan dari QR meja yang dipindai tamu (diingat HP 48 jam).
+* Satu receiver hanya bisa dipinjam satu orang pada satu waktu, **lintas acara**, lewat kunci `sis/unitAktif/<unit>`.
 
-**PENTING setelah update:** tempel ulang `database.rules.json` ke Realtime Database -> Rules -> Publish (ada aturan baru untuk `uid` peminjam dan `nilai`). Tanpa ini pendaftaran tamu akan ditolak.
+### Stok dan penutupan acara (halaman Usher, tab Stok)
 
-## Banyak ruangan + Super Admin (v1.3)
-Satu project Firebase, banyak ruangan/acara. **Acara utama lama tidak berubah**: alamat `#/` (tamu) dan `#/usher` tetap memakai data `interpreter/*`. Ruangan baru memakai `interpreter/rooms/<id>/*` (data, channel, teknisi, penilaian terpisah).
+1. **Terima dari teknisi**: isi jumlah dan nama teknisi. Tombol hilang setelah diklik (ada tautan kecil "penerimaan susulan").
+2. **Kembalikan ke teknisi**: isi jumlah yang diserahkan. Kalau kurang, catatan terisi otomatis dengan peminjam yang belum
+   mengembalikan; sisa kekurangan tanpa peminjam diberi alasan (hilang, rusak, tertinggal di ruangan, lainnya).
+3. **Acara Selesai** baru muncul setelah langkah 2. Receiver yang belum kembali ditandai "tidak kembali" dan kuncinya dilepas.
 
-**Alamat**
-- Tamu ruangan: `#/r/<id>`  (QR-nya ada di panel Super Admin)
-- Dashboard Usher ruangan: `#/usher/<id>` (ada pilihan ruangan di bagian atas dashboard)
-- Panel Super Admin: `#/admin` (buat/ubah jadwal/hapus ruangan, salin link, QR)
+## Penomoran alat
 
-**Pasang (sekali)**
-1. Realtime Database -> Rules -> tempel `database.rules.json` terbaru -> Publish. (Bagian aturan lama identik dengan sebelumnya; yang baru hanya menambah `rooms`, `ruangan`, `superadmin`, `superDaftar`.)
-2. Jadikan seseorang Super Admin, langsung di Realtime Database -> Data (tidak bisa dari web):
-   - `interpreter/usherDaftar/628123456789` = `Nama` (kalau belum ada), dan
-   - `interpreter/superDaftar/628123456789` = `true`
-   (atau untuk akun email: `interpreter/superadmin/<UID>` = `true` dan `interpreter/usher/<UID>` = `true`).
-3. Login di `#/usher` dengan nama + nomor itu -> muncul tombol **⚙️ Kelola ruangan**.
+Nomor unit `A001` sampai `J100` (1 huruf per 100 alat, total 1000). Aturan ini ada di `src/util.js` (`UNIT_RE`) dan
+di `database.rules.json`. Mengubahnya berarti mengubah keduanya.
 
-**Alur tiap acara**: Super Admin buat ruangan (nama, tanggal, jam mulai/selesai) -> buka dashboard ruangan -> Pengaturan -> isi **Channel bahasa** -> cetak QR dari panel Super Admin. Nomor teknisi dan teks pengingat disalin dari acara utama saat ruangan dibuat; daftar Usher dan channel mulai kosong. Menghapus Usher di dalam ruangan hanya melepas dari ruangan itu, tidak mencabut hak login.
+## Pemasangan (menimpa repo lama)
 
-**Akses per ruangan (v1.4)**: dashboard ruangan hanya bisa dibuka oleh petugas yang ditugaskan Super Admin (panel `#/admin` -> tombol **👥 Petugas** pada ruangan) dan oleh Super Admin. Dijaga di Rules database, bukan hanya disembunyikan di menu. Acara utama (default) tetap bisa dibuka semua Usher seperti semula. Ruangan yang belum punya petugas hanya bisa dibuka Super Admin. Pasang Rules terbaru bersamaan dengan kode baru.
+1. **Firebase Console** (proyek `sis-tstindo`):
+   * Authentication, Sign-in method: aktifkan **Anonymous**.
+   * Realtime Database, Rules: tempel isi `database.rules.json`, lalu **Publish**.
+   * Realtime Database, Data: buat node `sis/superDaftar/62812XXXXXXXX` dengan nilai `true`
+     (nomor Super Admin format `62…` tanpa spasi atau tanda hubung). Tambahkan satu per nomor.
+2. **GitHub**: hapus isi repo lama, salin seluruh isi folder ini, commit ke `main`. Workflow `deploy.yaml`
+   membangun dan mempublikasikan ke GitHub Pages (Settings, Pages, Source: GitHub Actions).
+3. Buka alamat situs, `#/admin`, masuk dengan nomor Super Admin.
+4. Data v1 di node `interpreter/` tidak dipakai lagi dan sudah tidak terbaca oleh Rules baru. Boleh dihapus lewat Console.
 
-## Jaminan peminjaman (v1.5)
-- **Super Admin**: panel `#/admin` -> tombol **🪪 Jaminan** (di Acara utama atau tiap ruangan): aktifkan, lalu centang jenis yang boleh dipilih (KTP, SIM, Paspor, Kartu nama, Password/PIN HP). Berlaku per ruangan/acara; minimal satu jenis (disarankan Kartu nama).
-- **Tamu**: bila aktif, form menampilkan pilihan jaminan (wajib pilih satu). Menambah alat atas nama yang sama memakai jaminan yang sama.
-- **Usher**: tiap peminjam menampilkan ikon + nama jaminan, dan dialog "Sudah kembali" mengingatkan jaminan mana yang harus dikembalikan. Kolom Jaminan ikut di CSV/PDF.
-- Hanya JENIS jaminan yang dicatat, bukan nomor KTP/password. Password tidak diketik di web.
-- **Tempel ulang `database.rules.json`** (field `jaminan`, `kembaliOleh`, `kembaliOlehHp`) lalu Publish.
+## Label
 
-## Siklus acara (v1.6) - dipakai ulang tiap event
-Tiap acara/ruangan adalah satu unit yang dibuat, dipakai, lalu diarsipkan. Tidak ada setelan permanen per event.
+Bawaan 30 × 35 mm, QR 25 mm (hanya berisi nomor unit) di atas dan nomor di bawah, 6 kolom × 8 baris per A4. Semua ukuran bisa diubah di halaman
+cetak (Super Admin, Cetak barcode alat) untuk menyesuaikan lembar stiker yang dibeli. Cetak 100 label per kali.
+Pakai stiker polyester/vinyl matte dengan printer laser atau thermal transfer.
 
-**Super Admin (`#/admin`)**
-1. **Buat acara**: nama, tanggal, jam, **jumlah alat dipesan**, dan *Salin pengaturan dari acara* (teknisi, teks pengingat, channel, jaminan, opsional petugas) supaya event berikutnya tinggal salin dari event sebelumnya.
-2. **👥 Petugas**: tugaskan Usher untuk acara itu. **Usher hanya bisa melihat acara yang ditugaskan kepadanya** (dijaga di Rules lewat indeks `interpreter/tugas/<nomor>/<acara>`), tidak bisa melihat daftar atau data acara lain.
-3. **🪪 Jaminan**: aktifkan dan pilih jenisnya.
-4. **QR** untuk tamu, cetak.
-5. Setelah acara: **🗄️ Arsipkan**. Tamu tidak bisa mendaftar lagi (dijaga di Rules), acara hilang dari daftar Usher, data tetap ada dan bisa **↩ Buka arsip**. Unduh PDF/CSV sebelum menghapus.
+## Pengembangan
 
-**Usher** (dashboard acara)
-- Kartu **📦 Stok alat**: Dipesan / Diterima / Dipinjam / Tersedia. **＋ Terima receiver dari teknisi** saat teknisi TST menyerahkan alat ke Usher, **↩ Kembalikan ke teknisi** saat alat diserahkan balik di akhir acara. Tiap catatan menyimpan jumlah, nama teknisi, nama Usher yang mencatat, waktu. Muncul peringatan saat stok menipis (≤3). Ringkasan stok dan riwayatnya ikut di laporan PDF/CSV.
-- Tamu scan QR -> isi data + jaminan + nomor receiver -> Usher menandai **Sudah kembali** (jaminan diingatkan).
+```bash
+npm install
+npm run dev      # http://localhost:5173
+npm test         # uji logika (nomor HP, tempel kontak, nomor unit)
+npm run build
+```
 
-**Acara utama (lama)** sekarang juga dibatasi: hanya Super Admin dan Usher di *Daftar Usher* acara utama. Saat Super Admin pertama kali membuka `#/admin`, Usher yang sudah ada di daftar itu otomatis ditugaskan, jadi tidak ada yang terkunci.
+Kamera (pemindai QR) hanya jalan di HTTPS atau `localhost`.
 
-**PENTING**: tempel ulang `database.rules.json` (ada node baru `tugas`, `stok`, field `arsip`, `jumlah`) lalu Publish. Buka `#/admin` sekali sebagai Super Admin setelah update untuk sinkron penugasan.
+## Uji sebelum dipakai di event
 
-## Tanpa "Acara utama" (v1.7) - project berikutnya
-Konsep **Acara utama (default)** sudah dihapus. Semua acara dibuat dari **Super Admin (`#/admin`) -> Buat acara**.
-- **`#/usher`** sekarang halaman *pilih acara*. Usher yang hanya punya satu acara langsung masuk ke dashboard acara itu.
-- **Acara aktif (⭐)**: satu acara ditandai aktif (acara pertama otomatis). QR stiker receiver yang lama/umum (`#/?no=A001`) dan alamat `#/` otomatis diarahkan ke acara aktif, jadi stiker di 170 receiver tidak perlu dicetak ulang. Ganti dengan tombol **⭐ Jadikan acara aktif** di tiap acara.
-- **Salin pengaturan dari acara** bawaannya acara terakhir (teknisi, teks pengingat, channel, jaminan, opsional petugas).
-- **Data acara lama**: bila masih ada sisa data acara utama, panel Super Admin menampilkan kartu **Data acara lama** -> *Buka & unduh laporan* (`#/usher/_`), lalu *Hapus data lama* (ketik HAPUS). Setelah terhapus, kartu itu hilang.
-- Cetak label: `#/cetak/<id-acara>` (tombol 🏷️ Label per acara). ID acara dikosongkan = QR mengikuti acara aktif.
+* [ ] Super Admin masuk, membuat acara, menempel 3 kontak, QR meja tercetak.
+* [ ] Usher masuk dengan nomor dari daftar, **diminta nama sekali**, tidak diminta lagi saat buka ulang.
+* [ ] Nomor yang tidak ada di daftar ditolak saat masuk.
+* [ ] Tamu scan QR meja, pinjam 3 receiver sekaligus (scan di dalam halaman dan ketik manual).
+* [ ] Receiver yang sama tidak bisa dipinjam dua orang, juga dari acara kedua.
+* [ ] Usher scan satu alat, "Kembalikan semua" bekerja, jaminan ditampilkan.
+* [ ] Terima dari teknisi, Kembalikan ke teknisi dengan kurang 1, catatan terisi, lalu Acara Selesai.
+* [ ] Setelah acara selesai, tamu tidak bisa meminjam dan nomor alat bebas dipakai acara lain.
+* [ ] Label hasil cetak terbaca oleh pemindai di halaman, di Android dan iPhone, dari jarak 10 sampai 20 cm.
 
-**PENTING**: tempel ulang `database.rules.json` (ada node baru `aktifAcara`) lalu Publish.
+## Catatan keamanan
 
-## Rentang tanggal + QR sama untuk semua acara (v1.8)
-- Buat acara: **Tanggal mulai - Tanggal selesai** + jam mulai/selesai (berlaku tiap hari).
-- QR receiver **tidak berubah antar acara**. Saat discan, tamu otomatis masuk ke acara yang sedang berlangsung hari itu. Bila tidak ada: acara cadangan (tombol ⭐), lalu acara terdekat berikutnya.
-- Jangan buat dua acara dengan tanggal yang bertumpuk bila stiker yang sama dipakai keduanya (QR akan masuk ke acara yang mulai paling akhir).
-- **Tempel ulang `database.rules.json`** (node baru `jadwalPublik`, field `tanggalSelesai`) lalu Publish. Acara yang dibuat sebelum v1.8: klik **Ubah** lalu **Simpan perubahan** sekali agar jadwalnya terdaftar.
+* Login petugas memakai **nomor HP yang terdaftar** (tanpa kata sandi). Siapa pun yang tahu nomor Usher bisa masuk
+  sebagai Usher acara itu. Jaga kerahasiaan daftar petugas, dan hapus petugas dari acara bila tidak lagi bertugas.
+* Konfigurasi web Firebase memang publik. Yang melindungi data adalah `database.rules.json`.
+* Rules belum diuji dengan Firebase Emulator di lingkungan pembuatan. Jalankan daftar uji di atas pada proyek sungguhan sebelum event.
