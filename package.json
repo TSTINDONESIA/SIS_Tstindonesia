@@ -10,6 +10,7 @@
     "test": "node test/util.test.mjs"
   },
   "dependencies": {
+    "barcode-detector": ">=2.2.0 <4.0.0",
     "firebase": "^10.13.0",
     "jspdf": "^2.5.2",
     "jspdf-autotable": "^3.8.4",
