@@ -131,11 +131,20 @@ export function Scanner({ onCode, hint, error }) {
         setZoomState(range.min);
         setOn(true);
 
+        // 1) Pembaca bawaan browser (Android/Chrome). 2) Kalau tidak ada (iPhone/Safari): ZXing WebAssembly,
+        // jauh lebih cepat dan tahan blur dibanding jsQR. 3) Kalau keduanya gagal dimuat: jsQR sebagai cadangan.
         if ('BarcodeDetector' in window) {
           try { det = new window.BarcodeDetector({ formats: ['qr_code'] }); } catch { det = null; }
         }
+        if (!det) {
+          try {
+            const m = await import('barcode-detector/ponyfill');
+            det = new m.BarcodeDetector({ formats: ['qr_code'] });
+          } catch { det = null; }
+        }
         const cv = document.createElement('canvas');
         const cx = cv.getContext('2d', { willReadFrequently: true });
+        let frame = 0;
         const tick = async () => {
           if (stop) return;
           let text = null;
@@ -148,7 +157,9 @@ export function Scanner({ onCode, hint, error }) {
               const vw = v.videoWidth, vh = v.videoHeight;
               const side = (Math.min(vw, vh) / dz) * 0.7;
               const sx = (vw - side) / 2, sy = (vh - side) / 2;
-              const out = Math.round(Math.min(side, 720));
+              // Selang-seling ukuran kecil (cepat) dan sedang (lebih teliti) tiap frame
+              frame += 1;
+              const out = Math.round(Math.min(side, frame % 2 ? 360 : 560));
               cv.width = out; cv.height = out;
               cx.drawImage(v, sx, sy, side, side, 0, 0, out, out);
               if (det) {
@@ -156,10 +167,13 @@ export function Scanner({ onCode, hint, error }) {
                 if (r && r[0]) text = r[0].rawValue;
               } else {
                 const d = cx.getImageData(0, 0, out, out);
-                const q = jsQR(d.data, d.width, d.height, { inversionAttempts: 'attemptBoth' });
+                const q = jsQR(d.data, d.width, d.height, { inversionAttempts: 'dontInvert' });
                 if (q) text = q.data;
               }
-            } catch { /* abaikan frame yang gagal */ }
+            } catch {
+              // Pembaca gagal (mis. WebAssembly tidak termuat/offline): pindah ke jsQR untuk frame berikutnya
+              det = null;
+            }
           }
           if (text) {
             const now = Date.now();
@@ -170,7 +184,10 @@ export function Scanner({ onCode, hint, error }) {
             }
             last.at = now;
           }
-          timer = setTimeout(tick, 90);
+          // Frame berikutnya segera setelah ini selesai (tanpa jeda tetap), disinkronkan dengan frame video
+          if (stop) return;
+          if (v.requestVideoFrameCallback) timer = v.requestVideoFrameCallback(() => tick());
+          else timer = requestAnimationFrame(() => tick());
         };
         tick();
       } catch (e) {
@@ -179,7 +196,8 @@ export function Scanner({ onCode, hint, error }) {
     })();
     return () => {
       stop = true;
-      clearTimeout(timer);
+      try { if (vref.current && vref.current.cancelVideoFrameCallback) vref.current.cancelVideoFrameCallback(timer); } catch { /* */ }
+      cancelAnimationFrame(timer);
       trk.current = null;
       if (stream) stream.getTracks().forEach((t) => t.stop());
     };
