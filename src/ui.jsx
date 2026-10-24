@@ -38,6 +38,39 @@ export function useHash() {
 // Kode yang sama dalam 2,5 detik diabaikan supaya tidak terhitung dobel.
 // Zoom: hardware bila didukung perangkat, kalau tidak zoom digital (crop tengah). Cubit 2 jari, tombol +/−, atau slider.
 // Fokus: kontinu otomatis, ketuk layar untuk fokus ulang.
+// Bunyi beep (WebAudio, tanpa file audio): dua nada keras, plus getar (Android; iPhone/Safari tidak mendukung getar).
+let actx = null;
+const getCtx = () => {
+  try {
+    if (!actx) { const AC = window.AudioContext || window.webkitAudioContext; if (AC) actx = new AC(); }
+    if (actx && actx.state === 'suspended') actx.resume();
+  } catch { /* */ }
+  return actx;
+};
+const beep = () => {
+  try {
+    const c = getCtx();
+    if (c) {
+      const t0 = c.currentTime;
+      const comp = c.createDynamicsCompressor();
+      const master = c.createGain();
+      master.gain.value = 1;
+      comp.connect(master); master.connect(c.destination);
+      [[1500, 0], [2200, 0.14]].forEach(([f, d]) => {
+        const o = c.createOscillator(), g = c.createGain();
+        o.type = 'square'; o.frequency.value = f;
+        g.gain.setValueAtTime(0.0001, t0 + d);
+        g.gain.exponentialRampToValueAtTime(1, t0 + d + 0.01);
+        g.gain.setValueAtTime(1, t0 + d + 0.10);
+        g.gain.exponentialRampToValueAtTime(0.0001, t0 + d + 0.13);
+        o.connect(g); g.connect(comp);
+        o.start(t0 + d); o.stop(t0 + d + 0.14);
+      });
+    }
+  } catch { /* */ }
+  try { navigator.vibrate && navigator.vibrate([200, 60, 200]); } catch { /* */ }
+};
+
 const ZBTN = { width: 44, height: 44, flex: '0 0 44px', borderRadius: 10, border: '1px solid #2F5FB3', background: '#123A7A', color: '#fff', fontSize: 24, lineHeight: 1, cursor: 'pointer' };
 
 export function Scanner({ onCode, hint, error }) {
@@ -49,6 +82,7 @@ export function Scanner({ onCode, hint, error }) {
   const cb = useRef(onCode);
   cb.current = onCode;
   const [err, setErr] = useState('');
+  useEffect(() => { getCtx(); }, []);
   const [on, setOn] = useState(false);
   const [zr, setZr] = useState({ min: 1, max: 4, step: 0.1, hw: false });
   const [zoom, setZoomState] = useState(1);
@@ -137,7 +171,7 @@ export function Scanner({ onCode, hint, error }) {
             const now = Date.now();
             if (!(last.t === text && now - last.at < 2500)) {
               last.t = text;
-              if (navigator.vibrate) navigator.vibrate(60);
+              beep();
               cb.current(text);
             }
             last.at = now;
