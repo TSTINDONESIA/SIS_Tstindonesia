@@ -12,7 +12,7 @@ export function useSesi() {
   const muat = useCallback(async () => {
     const u = await ready;
     const sn = await get(ref(db, 'sis/sesi/' + u.uid));
-    const hp = sn.val();
+    const hp = sn.val() === 'tamu' ? null : sn.val();
     let isSuper = false;
     if (hp) {
       try { isSuper = (await get(ref(db, 'sis/superDaftar/' + hp))).exists(); } catch { isSuper = false; }
