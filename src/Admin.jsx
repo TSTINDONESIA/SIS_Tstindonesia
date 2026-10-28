@@ -182,6 +182,7 @@ function Beranda({ sesi }) {
   const [acara, setAcara] = useState(null);
   const [dlg, setDlg] = useState(null);
   const [err, setErr] = useState('');
+  const [busyBuka, setBusyBuka] = useState(false);
   const muat = useCallback(async () => {
     try {
       const sn = await get(ref(db, 'sis/indeks'));
@@ -204,6 +205,30 @@ function Beranda({ sesi }) {
       await update(ref(db, 'sis'), upd);
       setDlg(null); muat();
     } catch (e) { setErr('Gagal menghapus: ' + (e.message || e)); }
+  }
+
+  // Buka kembali acara yang sudah ditandai selesai. Kode acara TIDAK berubah, jadi QR meja lama tetap berlaku.
+  async function bukaKembali(a) {
+    setErr(''); setBusyBuka(true);
+    try {
+      // Langkah 1: status kembali aktif (aturan database mensyaratkan status aktif sebelum kunci alat bisa dipasang).
+      await update(ref(db, 'sis'), { [`acara/${a.id}/status`]: 'aktif' });
+      // Langkah 2: receiver yang tadi ditandai "tidak kembali" saat acara ditutup dipulihkan menjadi "dipinjam"
+      // dan kuncinya dipasang lagi, kecuali alat itu sudah dipinjam acara/orang lain.
+      const pj = (await get(ref(db, `sis/acara/${a.id}/pinjam`))).val() || {};
+      const upd = {}; let bentrok = 0;
+      for (const [id, l] of Object.entries(pj)) {
+        if (!l || l.status !== 'tidakKembali') continue;
+        const k = (await get(ref(db, 'sis/unitAktif/' + l.receiver))).val();
+        if (k && !(k.acara === a.id && k.loan === id)) { bentrok++; continue; }
+        upd[`acara/${a.id}/pinjam/${id}/status`] = 'dipinjam';
+        upd[`unitAktif/${l.receiver}`] = { acara: a.id, loan: id };
+      }
+      if (Object.keys(upd).length) await update(ref(db, 'sis'), upd);
+      if (bentrok) setErr(`Acara dibuka kembali. ${bentrok} receiver tidak dipulihkan karena sedang dipinjam di acara lain; periksa di tab Stok.`);
+      setDlg(null); muat();
+    } catch (e) { setErr('Gagal membuka kembali: ' + (e.message || e)); }
+    setBusyBuka(false);
   }
 
   return (
@@ -232,12 +257,25 @@ function Beranda({ sesi }) {
             <button className="btn" onClick={() => setDlg({ j: 'usher', a })}>Usher</button>
             <button className="btn" onClick={() => setDlg({ j: 'hapus', a })}>Hapus</button>
           </div>
+          {a.status === 'selesai' ? (
+            <div className="rowbtn">
+              <button className="btn primary" onClick={() => setDlg({ j: 'buka', a })}>↩ Buka kembali acara</button>
+            </div>
+          ) : null}
         </div>
       ))}
 
       {dlg && dlg.j === 'baru' ? <FormAcara acara={(acara || []).filter((a) => !a.rusak)} onClose={() => setDlg(null)} onSelesai={(eid) => { setDlg(null); muat(); location.hash = '#/usher/' + eid; }} /> : null}
       {dlg && dlg.j === 'usher' ? <UbahPetugas a={dlg.a} onClose={() => setDlg(null)} onSelesai={() => { setDlg(null); muat(); }} /> : null}
       {dlg && dlg.j === 'qr' ? <QrAcara a={dlg.a} onClose={() => setDlg(null)} /> : null}
+      {dlg && dlg.j === 'buka' ? (
+        <Modal onClose={() => setDlg(null)}>
+          <h2>Buka kembali acara?</h2>
+          <p>"{dlg.a.meta.nama}" akan kembali Aktif. QR meja yang sudah dicetak tetap bisa dipakai peserta (kode acara tidak berubah). Receiver yang tadi ditandai "tidak kembali" dikembalikan menjadi "dipinjam".</p>
+          <button className="btn primary" disabled={busyBuka} onClick={() => bukaKembali(dlg.a)}>{busyBuka ? 'Memproses…' : 'Ya, buka kembali'}</button>
+          <button className="btn" onClick={() => setDlg(null)}>Batal</button>
+        </Modal>
+      ) : null}
       {dlg && dlg.j === 'hapus' ? (
         <Modal onClose={() => setDlg(null)}>
           <h2>Hapus acara?</h2>
