@@ -27,6 +27,13 @@ di-host di GitHub Pages. Dibuat dari nol; tidak memakai data v1 (semua data baru
    mengembalikan; sisa kekurangan tanpa peminjam diberi alasan (hilang, rusak, tertinggal di ruangan, lainnya).
 3. **Acara Selesai** baru muncul setelah langkah 2. Receiver yang belum kembali ditandai "tidak kembali" dan kuncinya dilepas.
 
+### Acara beberapa hari, laporan harian, "Hari ini selesai"
+
+* Saat **Buat acara** isi *Tanggal mulai* dan *Tanggal selesai* (jam mulai/selesai berlaku tiap hari). Acara yang sudah ada bisa diubah lewat tombol **Jadwal** di Super Admin; kode acara dan QR meja tidak berubah.
+* Usher, tab **Peminjaman**, tombol **📅 Hari ini selesai**: mencatat hari itu ditutup (acara tetap Aktif), lalu antrean pengingat untuk peminjam yang belum mengembalikan. Tiap pengingat membuka WhatsApp/email dengan pesan siap kirim.
+* Tab **Pengaturan, Laporan**: *Harian CSV/PDF* berisi dipinjam, dikembalikan, dan belum kembali per hari.
+* Aturan database berubah (`tanggalSelesai` di meta, jenis log `hari`): **publish ulang `database.rules.json`**.
+
 ## Penomoran alat
 
 Nomor unit `A001` sampai `J100` (1 huruf per 100 alat, total 1000). Aturan ini ada di `src/util.js` (`UNIT_RE`) dan

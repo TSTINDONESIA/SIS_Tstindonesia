@@ -44,3 +44,22 @@ assert.equal(grupKey('A@B.com'), 'a@b.com');
 assert.ok(validContact('0812345678') && validContact('a@b.co') && !validContact('abc'));
 assert.equal(isiPesan('Hai {nama} {x}', { nama: 'Budi' }), 'Hai Budi {x}');
 console.log('util.test OK');
+
+// ---- acara beberapa hari ----
+import { jadwalText, daftarHari, ringkasHarian, tglKey } from '../src/util.js';
+const mm = { nama: 'x', tanggal: '2026-10-27', tanggalSelesai: '2026-10-29', mulai: '09:00', selesai: '17:00' };
+assert.deepEqual(daftarHari(mm), ['2026-10-27', '2026-10-28', '2026-10-29']);
+assert.deepEqual(daftarHari({ tanggal: '2026-10-27', mulai: '09:00', selesai: '17:00' }), ['2026-10-27']);
+assert.ok(jadwalText(mm).includes('(tiap hari)'));
+assert.ok(!jadwalText({ tanggal: '2026-10-27', mulai: '09:00', selesai: '17:00' }).includes('tiap hari'));
+const t = (k, h) => { const [y, mo, d] = k.split('-').map(Number); return new Date(y, mo - 1, d, h).getTime(); };
+const L = [
+  { receiver: 'A001', waktu: t('2026-10-27', 10), kembaliWaktu: t('2026-10-27', 16) },
+  { receiver: 'A002', waktu: t('2026-10-27', 11), kembaliWaktu: t('2026-10-28', 9) },
+  { receiver: 'A003', waktu: t('2026-10-28', 10) },
+];
+const rr = ringkasHarian(L, ['2026-10-27', '2026-10-28']);
+assert.equal(rr[0].dipinjam.length, 2); assert.equal(rr[0].kembali.length, 1); assert.equal(rr[0].belum.length, 1);
+assert.equal(rr[1].dipinjam.length, 1); assert.equal(rr[1].kembali.length, 1); assert.equal(rr[1].belum.length, 1);
+assert.equal(tglKey(t('2026-10-28', 23)), '2026-10-28');
+console.log('multi-hari OK');

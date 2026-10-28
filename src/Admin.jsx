@@ -64,7 +64,7 @@ function EditorPetugas({ list, setList }) {
 
 // ================= Buat acara =================
 function FormAcara({ acara, onClose, onSelesai }) {
-  const [f, setF] = useState({ nama: '', tanggal: hariIni(), mulai: '09:00', selesai: '17:00', dipesan: '', teknisiNama: '', teknisiWa: '' });
+  const [f, setF] = useState({ nama: '', tanggal: hariIni(), tanggalSelesai: hariIni(), mulai: '09:00', selesai: '17:00', dipesan: '', teknisiNama: '', teknisiWa: '' });
   const [petugas, setPetugas] = useState([]);
   const [cfgSalin, setCfgSalin] = useState(null);
   const [err, setErr] = useState('');
@@ -82,7 +82,8 @@ function FormAcara({ acara, onClose, onSelesai }) {
   async function simpan() {
     setErr('');
     if (!f.nama.trim()) return setErr('Nama acara wajib diisi.');
-    if (!f.tanggal) return setErr('Tanggal wajib diisi.');
+    if (!f.tanggal || !f.tanggalSelesai) return setErr('Tanggal mulai dan tanggal selesai wajib diisi.');
+    if (f.tanggalSelesai < f.tanggal) return setErr('Tanggal selesai tidak boleh sebelum tanggal mulai.');
     if (!f.mulai || !f.selesai) return setErr('Jam mulai dan selesai wajib diisi.');
     if (!petugas.length) return setErr('Tambahkan minimal satu Usher.');
     setBusy(true);
@@ -92,6 +93,7 @@ function FormAcara({ acara, onClose, onSelesai }) {
     const w = normHp(f.teknisiWa);
     if (w) cfg.teknisiWa = w; else delete cfg.teknisiWa;
     const meta = { nama: f.nama.trim().slice(0, 80), tanggal: f.tanggal, mulai: f.mulai, selesai: f.selesai, dibuat: Date.now() };
+    if (f.tanggalSelesai > f.tanggal) meta.tanggalSelesai = f.tanggalSelesai;
     if (Number(f.dipesan) > 0) meta.dipesan = Math.min(100000, Math.floor(Number(f.dipesan)));
     const upd = {};
     upd[`indeks/${eid}`] = true;
@@ -119,9 +121,12 @@ function FormAcara({ acara, onClose, onSelesai }) {
       ) : null}
       <label>Nama acara<input value={f.nama} maxLength={80} onChange={(e) => setF({ ...f, nama: e.target.value })} /></label>
       <div className="rowbtn">
-        <label>Tanggal<input type="date" value={f.tanggal} onChange={(e) => setF({ ...f, tanggal: e.target.value })} /></label>
-        <label>Mulai<input type="time" value={f.mulai} onChange={(e) => setF({ ...f, mulai: e.target.value })} /></label>
-        <label>Selesai<input type="time" value={f.selesai} onChange={(e) => setF({ ...f, selesai: e.target.value })} /></label>
+        <label>Tanggal mulai<input type="date" value={f.tanggal} onChange={(e) => setF({ ...f, tanggal: e.target.value, tanggalSelesai: f.tanggalSelesai < e.target.value ? e.target.value : f.tanggalSelesai })} /></label>
+        <label>Tanggal selesai<input type="date" min={f.tanggal} value={f.tanggalSelesai} onChange={(e) => setF({ ...f, tanggalSelesai: e.target.value })} /></label>
+      </div>
+      <div className="rowbtn">
+        <label>Jam mulai (tiap hari)<input type="time" value={f.mulai} onChange={(e) => setF({ ...f, mulai: e.target.value })} /></label>
+        <label>Jam selesai (tiap hari)<input type="time" value={f.selesai} onChange={(e) => setF({ ...f, selesai: e.target.value })} /></label>
       </div>
       <label>Jumlah receiver yang dipesan (opsional)<input type="number" inputMode="numeric" min="0" value={f.dipesan} onChange={(e) => setF({ ...f, dipesan: e.target.value })} /></label>
       <div className="rowbtn">
@@ -131,6 +136,41 @@ function FormAcara({ acara, onClose, onSelesai }) {
       <EditorPetugas list={petugas} setList={setPetugas} />
       {err ? <div className="err">{err}</div> : null}
       <button className="btn primary" disabled={busy} onClick={simpan}>{busy ? 'Menyimpan…' : 'Buat acara'}</button>
+      <button className="btn" onClick={onClose}>Batal</button>
+    </Modal>
+  );
+}
+
+// ================= Ubah jadwal acara (kode & QR meja tidak berubah) =================
+function UbahJadwal({ a, onClose, onSelesai }) {
+  const [f, setF] = useState({ tanggal: a.meta.tanggal || hariIni(), tanggalSelesai: a.meta.tanggalSelesai || a.meta.tanggal || hariIni(), mulai: a.meta.mulai || '09:00', selesai: a.meta.selesai || '17:00' });
+  const [err, setErr] = useState('');
+  const [busy, setBusy] = useState(false);
+  async function simpan() {
+    setErr('');
+    if (!f.tanggal || !f.tanggalSelesai || !f.mulai || !f.selesai) return setErr('Semua tanggal dan jam wajib diisi.');
+    if (f.tanggalSelesai < f.tanggal) return setErr('Tanggal selesai tidak boleh sebelum tanggal mulai.');
+    setBusy(true);
+    try {
+      await update(ref(db, `sis/acara/${a.id}/meta`), { tanggal: f.tanggal, tanggalSelesai: f.tanggalSelesai > f.tanggal ? f.tanggalSelesai : null, mulai: f.mulai, selesai: f.selesai });
+      onSelesai();
+    } catch (e) { setErr('Gagal menyimpan: ' + (e.message || e)); setBusy(false); }
+  }
+  return (
+    <Modal>
+      <h2>Ubah jadwal acara</h2>
+      <div className="muted">{a.meta.nama}</div>
+      <div className="rowbtn">
+        <label>Tanggal mulai<input type="date" value={f.tanggal} onChange={(e) => setF({ ...f, tanggal: e.target.value, tanggalSelesai: f.tanggalSelesai < e.target.value ? e.target.value : f.tanggalSelesai })} /></label>
+        <label>Tanggal selesai<input type="date" min={f.tanggal} value={f.tanggalSelesai} onChange={(e) => setF({ ...f, tanggalSelesai: e.target.value })} /></label>
+      </div>
+      <div className="rowbtn">
+        <label>Jam mulai (tiap hari)<input type="time" value={f.mulai} onChange={(e) => setF({ ...f, mulai: e.target.value })} /></label>
+        <label>Jam selesai (tiap hari)<input type="time" value={f.selesai} onChange={(e) => setF({ ...f, selesai: e.target.value })} /></label>
+      </div>
+      <p className="muted">Kode acara dan QR meja yang sudah dicetak tidak berubah.</p>
+      {err ? <div className="err">{err}</div> : null}
+      <button className="btn primary" disabled={busy} onClick={simpan}>{busy ? 'Menyimpan…' : 'Simpan jadwal'}</button>
       <button className="btn" onClick={onClose}>Batal</button>
     </Modal>
   );
@@ -254,6 +294,7 @@ function Beranda({ sesi }) {
             <button className="btn" onClick={() => setDlg({ j: 'qr', a })}>QR meja</button>
           </div>
           <div className="rowbtn">
+            <button className="btn" onClick={() => setDlg({ j: 'jadwal', a })}>Jadwal</button>
             <button className="btn" onClick={() => setDlg({ j: 'usher', a })}>Usher</button>
             <button className="btn" onClick={() => setDlg({ j: 'hapus', a })}>Hapus</button>
           </div>
@@ -266,6 +307,7 @@ function Beranda({ sesi }) {
       ))}
 
       {dlg && dlg.j === 'baru' ? <FormAcara acara={(acara || []).filter((a) => !a.rusak)} onClose={() => setDlg(null)} onSelesai={(eid) => { setDlg(null); muat(); location.hash = '#/usher/' + eid; }} /> : null}
+      {dlg && dlg.j === 'jadwal' ? <UbahJadwal a={dlg.a} onClose={() => setDlg(null)} onSelesai={() => { setDlg(null); muat(); }} /> : null}
       {dlg && dlg.j === 'usher' ? <UbahPetugas a={dlg.a} onClose={() => setDlg(null)} onSelesai={() => { setDlg(null); muat(); }} /> : null}
       {dlg && dlg.j === 'qr' ? <QrAcara a={dlg.a} onClose={() => setDlg(null)} /> : null}
       {dlg && dlg.j === 'buka' ? (

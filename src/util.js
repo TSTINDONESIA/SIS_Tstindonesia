@@ -112,11 +112,54 @@ export const newEid = () => {
 // ===== Waktu =====
 export const fmtJam = (t) => (t ? new Date(t).toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) : '-');
 export const fmtTgl = (t) => (t ? new Date(t).toLocaleString('id-ID', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' }) : '-');
+const fmtTglPanjang = (t) => {
+  const [y, mo, d] = String(t).split('-').map(Number);
+  return new Date(y, mo - 1, d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' });
+};
+// Acara boleh satu hari (hanya `tanggal`) atau beberapa hari (`tanggal` s/d `tanggalSelesai`, jam sama tiap hari).
+export const tglAkhirAcara = (m) => (m && m.tanggalSelesai && m.tanggalSelesai > m.tanggal ? m.tanggalSelesai : m && m.tanggal);
 export const jadwalText = (m) => {
   if (!m || !m.tanggal) return '';
-  const [y, mo, d] = String(m.tanggal).split('-').map(Number);
-  return new Date(y, mo - 1, d).toLocaleDateString('id-ID', { day: 'numeric', month: 'short', year: 'numeric' }) + ' · ' + m.mulai + '–' + m.selesai;
+  const akhir = tglAkhirAcara(m);
+  const banyak = akhir !== m.tanggal;
+  return (banyak ? fmtTglPanjang(m.tanggal) + ' – ' + fmtTglPanjang(akhir) : fmtTglPanjang(m.tanggal)) + ' · ' + m.mulai + '–' + m.selesai + (banyak ? ' (tiap hari)' : '');
 };
+
+// ===== Per hari (acara beberapa hari) =====
+const dua = (n) => String(n).padStart(2, '0');
+export const tglKey = (t) => { const d = new Date(t); return `${d.getFullYear()}-${dua(d.getMonth() + 1)}-${dua(d.getDate())}`; };
+export const hariIniKey = () => tglKey(Date.now());
+export const tglLabel = (key) => fmtTglPanjang(key);
+const awalHari = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d, 0, 0, 0, 0).getTime(); };
+const akhirHari = (key) => { const [y, m, d] = key.split('-').map(Number); return new Date(y, m - 1, d, 23, 59, 59, 999).getTime(); };
+// Semua tanggal dari awal sampai akhir acara (maks. 60 hari).
+export const daftarHari = (m) => {
+  if (!m || !m.tanggal) return [];
+  const [y, mo, d] = m.tanggal.split('-').map(Number);
+  const [y2, mo2, d2] = tglAkhirAcara(m).split('-').map(Number);
+  const out = [];
+  for (const c = new Date(y, mo - 1, d); c <= new Date(y2, mo2 - 1, d2) && out.length < 60; c.setDate(c.getDate() + 1)) out.push(tglKey(c));
+  return out;
+};
+// Ringkasan per hari: dipinjam hari itu, dikembalikan hari itu, dan yang belum kembali pada akhir hari itu.
+// Dihitung dari waktu pinjam / waktu kembali yang sudah tercatat, jadi tidak perlu data tambahan.
+export const ringkasHarian = (loans, hariList) => hariList.map((hari) => {
+  const akhir = akhirHari(hari);
+  return {
+    hari,
+    dipinjam: loans.filter((l) => l.waktu && tglKey(l.waktu) === hari),
+    kembali: loans.filter((l) => l.kembaliWaktu && tglKey(l.kembaliWaktu) === hari),
+    belum: loans.filter((l) => l.waktu && l.waktu <= akhir && !(l.kembaliWaktu && l.kembaliWaktu <= akhir)),
+  };
+});
+// Hari yang dilaporkan: rentang acara + hari lain yang ternyata ada peminjaman, sampai hari ini.
+export const hariLaporan = (m, loans) => {
+  const set = new Set(daftarHari(m));
+  loans.forEach((l) => { if (l.waktu) set.add(tglKey(l.waktu)); });
+  const today = hariIniKey();
+  return [...set].filter((k) => k <= today).sort();
+};
+
 export const salamWaktu = (d = new Date()) => {
   const h = d.getHours();
   return h >= 4 && h < 11 ? 'pagi' : h >= 11 && h < 15 ? 'siang' : h >= 15 && h < 18 ? 'sore' : 'malam';

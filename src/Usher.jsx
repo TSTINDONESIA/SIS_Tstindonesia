@@ -10,6 +10,7 @@ import { pdfQrMeja, bukaCetak } from './labels.js';
 import {
   ALASAN, JAMINAN, JAMINAN_DEFAULT, DEFAULT_PESAN, contactLink, eventUrl, fmtJam, fmtTgl, isiPesan, jadwalText, jaminanAktif,
   grupKey, jaminanInfo, normHp, salamWaktu, tampilHp, unitFromScan, unitNorm, validContact, waLink,
+  daftarHari, hariIniKey, hariLaporan, ringkasHarian, tglLabel,
 } from './util.js';
 
 const STATUS_TEKS = { dipinjam: 'Dipinjam', kembali: 'Kembali', tidakKembali: 'Tidak kembali' };
@@ -292,6 +293,127 @@ function eksporPdf(meta, loans, logs, diterima, nilaiRata) {
   unduh(`laporan-${meta.nama.replace(/[^a-z0-9]+/gi, '-')}.pdf`, doc.output('blob'));
 }
 
+// Laporan per hari: ringkasan + rincian tiap hari (peminjaman hari itu dan yang belum kembali di akhir hari).
+function eksporHarianCsv(meta, loans) {
+  const hari = ringkasHarian(loans, hariLaporan(meta, loans));
+  const baris = [['Tanggal', 'Dipinjam hari itu', 'Dikembalikan hari itu', 'Belum kembali (akhir hari)', 'Peminjam yang belum kembali (receiver)']];
+  hari.forEach((h) => baris.push([h.hari, h.dipinjam.length, h.kembali.length, h.belum.length, h.belum.map((l) => `${l.nama} (${l.receiver})`).join('; ')]));
+  const teks = '\ufeff' + baris.map((r) => r.map(csvSel).join(',')).join('\r\n');
+  unduh(`laporan-harian-${meta.nama.replace(/[^a-z0-9]+/gi, '-')}.csv`, new Blob([teks], { type: 'text/csv;charset=utf-8' }));
+}
+
+function eksporHarianPdf(meta, loans) {
+  const hari = ringkasHarian(loans, hariLaporan(meta, loans));
+  const doc = new jsPDF({ orientation: 'landscape', unit: 'mm', format: 'a4' });
+  doc.setFontSize(15);
+  doc.text('Laporan Harian Receiver Interpreter', 14, 14);
+  doc.setFontSize(10);
+  doc.text(`${meta.nama} | ${jadwalText(meta)}`, 14, 21);
+  autoTable(doc, {
+    startY: 26,
+    head: [['Tanggal', 'Dipinjam', 'Dikembalikan', 'Belum kembali (akhir hari)']],
+    body: hari.map((h) => [tglLabel(h.hari), h.dipinjam.length, h.kembali.length, h.belum.length]),
+    styles: { fontSize: 9 },
+    headStyles: { fillColor: [18, 41, 77] },
+  });
+  hari.forEach((h) => {
+    doc.addPage();
+    doc.setFontSize(13);
+    doc.text(`Hari ${tglLabel(h.hari)}`, 14, 14);
+    doc.setFontSize(9);
+    doc.text(`Dipinjam: ${h.dipinjam.length} | Dikembalikan: ${h.kembali.length} | Belum kembali di akhir hari: ${h.belum.length}`, 14, 20);
+    autoTable(doc, {
+      startY: 24,
+      head: [['Belum kembali di akhir hari', 'Kontak', 'Institusi', 'Receiver', 'Dipinjam']],
+      body: h.belum.length ? h.belum.map((l) => [l.nama, l.hp, l.institusi, l.receiver, fmtTgl(l.waktu)]) : [['— semua sudah kembali —', '', '', '', '']],
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [185, 28, 28] },
+    });
+    autoTable(doc, {
+      startY: doc.lastAutoTable.finalY + 6,
+      head: [['Dipinjam hari ini', 'Kontak', 'Institusi', 'Receiver', 'Pinjam', 'Kembali']],
+      body: h.dipinjam.length ? h.dipinjam.map((l) => [l.nama, l.hp, l.institusi, l.receiver, fmtJam(l.waktu), l.kembaliWaktu ? fmtTgl(l.kembaliWaktu) : '-']) : [['— tidak ada —', '', '', '', '', '']],
+      styles: { fontSize: 8 },
+      headStyles: { fillColor: [47, 111, 219] },
+    });
+  });
+  unduh(`laporan-harian-${meta.nama.replace(/[^a-z0-9]+/gi, '-')}.pdf`, doc.output('blob'));
+}
+
+// ================= Dialog: hari ini selesai + antrean pengingat =================
+function DialogHari({ meta, loans, grup, logs, ingatkan, onTutup, onClose }) {
+  const hari = hariIniKey();
+  const r = ringkasHarian(loans, [hari])[0];
+  const semuaHari = daftarHari(meta);
+  const ke = semuaHari.indexOf(hari) + 1;
+  const sudahTutup = logs.some((l) => l.jenis === 'hari' && l.tanggal === hari);
+  const [tutup, setTutup] = useState(sudahTutup);
+  const [kirim, setKirim] = useState(new Set());
+  const [busy, setBusy] = useState(false);
+  const [err, setErr] = useState('');
+  const belum = grup.filter((g) => g.items.some((l) => l.status === 'dipinjam'));
+  const noBelum = belum.reduce((n, g) => n + g.items.filter((l) => l.status === 'dipinjam').length, 0);
+  const sisa = belum.filter((g) => !kirim.has(g.key));
+
+  async function tutupHari() {
+    setErr(''); setBusy(true);
+    try {
+      const judul = semuaHari.length > 1 && ke > 0 ? `Hari ke-${ke} dari ${semuaHari.length}` : 'Hari ini';
+      await onTutup({ hari, jumlah: noBelum, catatan: `${judul}: dipinjam ${r.dipinjam.length}, dikembalikan ${r.kembali.length}, belum kembali ${noBelum}` });
+      setTutup(true);
+    } catch (e) { setErr('Gagal menutup hari: ' + (e.message || e)); }
+    setBusy(false);
+  }
+  function kirimKe(g) {
+    ingatkan(g);
+    setKirim((x) => new Set([...x, g.key]));
+  }
+
+  return (
+    <Modal wide>
+      <h2>{tutup ? '✓ Hari ini ditutup' : 'Hari ini selesai?'}</h2>
+      <div className="muted">{tglLabel(hari)}{semuaHari.length > 1 && ke > 0 ? ` · hari ke-${ke} dari ${semuaHari.length}` : ''}</div>
+      <div className="stats">
+        <div><b>{r.dipinjam.length}</b><span>Dipinjam hari ini</span></div>
+        <div><b>{r.kembali.length}</b><span>Dikembalikan</span></div>
+        <div><b style={{ color: noBelum ? '#FCA5A5' : undefined }}>{noBelum}</b><span>Belum kembali</span></div>
+      </div>
+      {!tutup ? (
+        <>
+          <p className="muted">Hari ini dicatat selesai di riwayat dan laporan harian. Acara tetap aktif untuk hari berikutnya. {belum.length ? `Setelah itu pengingat untuk ${belum.length} peminjam yang belum mengembalikan alat bisa dikirim satu per satu.` : 'Semua alat sudah kembali.'}</p>
+          {err ? <div className="err">{err}</div> : null}
+          <button className="btn primary" disabled={busy} onClick={tutupHari}>{busy ? 'Menyimpan…' : belum.length ? `Hari ini selesai & ingatkan (${belum.length})` : 'Hari ini selesai'}</button>
+          <button className="btn" onClick={onClose}>Batal</button>
+        </>
+      ) : (
+        <>
+          {sudahTutup && !kirim.size ? <div className="jamdone">Hari ini sudah ditutup sebelumnya. Pengingat bisa dikirim lagi.</div> : null}
+          {belum.length ? (
+            <>
+              <button className="btn wa big-cta" disabled={!sisa.length} onClick={() => kirimKe(sisa[0])}>
+                {sisa.length ? `Kirim pengingat berikutnya: ${sisa[0].nama} (${sisa.length} lagi)` : '✓ Semua pengingat sudah dikirim'}
+              </button>
+              {belum.map((g) => {
+                const bk = g.items.filter((l) => l.status === 'dipinjam');
+                return (
+                  <div key={g.key} className="grp">
+                    <div className="row"><span className="who2">{g.nama}</span><span className={'pill ' + (kirim.has(g.key) ? 'on' : '')}>{kirim.has(g.key) ? 'Terkirim' : 'Belum'}</span></div>
+                    <div className="sub">{g.institusi} · {g.hp}</div>
+                    <div className="chips">{bk.map((l) => <span key={l.id} className="chip warn">{l.receiver}</span>)}</div>
+                    <div className="rowbtn"><button className="btn wa" onClick={() => kirimKe(g)}>{kirim.has(g.key) ? 'Kirim lagi' : 'Ingatkan'}</button></div>
+                  </div>
+                );
+              })}
+              <p className="muted fine">Pengiriman membuka WhatsApp/email dengan pesan siap kirim; Usher tinggal menekan kirim. Pesan bisa diubah di Pengaturan.</p>
+            </>
+          ) : <div className="jamdone">Semua receiver sudah kembali. Tidak ada pengingat.</div>}
+          <button className="btn" onClick={onClose}>Selesai</button>
+        </>
+      )}
+    </Modal>
+  );
+}
+
 // ================= Pengaturan acara (teknisi, jaminan, channel, pesan) =================
 function Pengaturan({ eid, meta, cfg, loans, logs, diterima, nilaiRata }) {
   const [tek, setTek] = useState(cfg.teknisiNama || '');
@@ -368,6 +490,11 @@ function Pengaturan({ eid, meta, cfg, loans, logs, diterima, nilaiRata }) {
         <div className="rowbtn">
           <button className="btn" onClick={() => eksporCsv(meta, loans)}>Unduh CSV</button>
           <button className="btn" onClick={() => eksporPdf(meta, loans, logs, diterima, nilaiRata)}>Unduh PDF</button>
+        </div>
+        <div className="muted" style={{ margin: '10px 0 6px' }}>Laporan per hari (dipinjam, dikembalikan, dan belum kembali tiap hari)</div>
+        <div className="rowbtn">
+          <button className="btn" onClick={() => eksporHarianCsv(meta, loans)}>Harian CSV</button>
+          <button className="btn" onClick={() => eksporHarianPdf(meta, loans)}>Harian PDF</button>
         </div>
       </div>
     </>
@@ -483,6 +610,7 @@ export function Dashboard({ eid, sesi }) {
     if (o.kurang != null) d.kurang = o.kurang;
     if (o.teknisi) d.teknisi = o.teknisi;
     if (o.catatan) d.catatan = o.catatan;
+    if (o.tanggal) d.tanggal = o.tanggal;
     await set(ref(db, `${b}/stok/log/${id}`), d);
   }
   async function acaraSelesai() {
@@ -558,6 +686,7 @@ export function Dashboard({ eid, sesi }) {
                 <button className="btn primary" onClick={() => { setInfo(''); setScan(true); }}>📷 Scan receiver</button>
                 <button className="btn" onClick={() => setDlg({ jenis: 'manual' })}>+ Catat manual</button>
               </div>
+              <button className="btn" style={{ width: '100%', marginTop: 8 }} onClick={() => setDlg({ jenis: 'hari' })}>📅 Hari ini selesai{buka.length ? ` · ${buka.length} belum kembali` : ''}</button>
               <div className="chedit">
                 <input value={ketik} placeholder="Ketik nomor, mis. A001" maxLength={6} style={{ textTransform: 'uppercase' }} onChange={(e) => setKetik(e.target.value.toUpperCase())}
                   onKeyDown={(e) => { if (e.key === 'Enter') { const u = unitNorm(ketik); if (u) { bukaKembaliDariUnit(u); setKetik(''); } else setInfo('Nomor tidak valid.'); } }} />
@@ -623,7 +752,7 @@ export function Dashboard({ eid, sesi }) {
             <h3>Riwayat stok</h3>
             {logs.length ? logs.slice().reverse().map((l) => (
               <div key={l.id} className="devrow row stoklog" style={{ display: 'block' }}>
-                <b style={{ color: '#E8EEF8' }}>{({ terima: 'Diterima', susulan: 'Susulan', retur: 'Dikembalikan ke teknisi', selesai: 'Acara selesai' })[l.jenis]}{l.jenis !== 'selesai' ? ` ${l.jumlah}` : ''}{l.kurang ? ` · kurang ${l.kurang}` : ''}</b>
+                <b style={{ color: '#E8EEF8' }}>{({ terima: 'Diterima', susulan: 'Susulan', retur: 'Dikembalikan ke teknisi', selesai: 'Acara selesai', hari: 'Hari ditutup' })[l.jenis]}{l.jenis === 'hari' ? ` ${l.tanggal ? tglLabel(l.tanggal) : ''} · ${l.jumlah} belum kembali` : l.jenis !== 'selesai' ? ` ${l.jumlah}` : ''}{l.kurang ? ` · kurang ${l.kurang}` : ''}</b>
                 <div>{fmtTgl(l.waktu)} · {l.oleh}{l.teknisi ? ' · teknisi ' + l.teknisi : ''}</div>
                 {l.catatan ? <div className="note" style={{ marginTop: 4 }}>{l.catatan}</div> : null}
               </div>
@@ -661,6 +790,10 @@ export function Dashboard({ eid, sesi }) {
       ) : null}
 
       {dlg && dlg.jenis === 'kembali' && grupDlg ? <DialogKembali grup={grupDlg} fokus={dlg.fokus} onClose={() => setDlg(null)} onKembali={kembalikan} onTukar={tukar} /> : null}
+      {dlg && dlg.jenis === 'hari' ? (
+        <DialogHari meta={meta} loans={loans} grup={grup} logs={logs} ingatkan={ingatkan} onClose={() => setDlg(null)}
+          onTutup={async (v) => { await catatLog({ jenis: 'hari', jumlah: v.jumlah, tanggal: v.hari, catatan: v.catatan }); }} />
+      ) : null}
       {dlg && dlg.jenis === 'manual' ? <DialogManual key={dlg.awal || 'x'} eid={eid} uid={uid} cfg={cfg} awal={dlg.awal} onClose={() => setDlg(null)} /> : null}
       {dlg && dlg.jenis === 'tidakAda' ? (
         <Modal onClose={() => setDlg(null)}>

@@ -71,6 +71,9 @@
             "tanggal": {
               ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
             },
+            "tanggalSelesai": {
+              ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)&&newData.val()>=newData.parent().child('tanggal').val()"
+            },
             "mulai": {
               ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{2}:[0-9]{2}$/)"
             },
@@ -245,7 +248,7 @@
               "$id": {
                 ".validate": "newData.hasChildren(['jenis','jumlah','oleh','waktu'])",
                 "jenis": {
-                  ".validate": "newData.val()==='terima'||newData.val()==='susulan'||newData.val()==='retur'||newData.val()==='selesai'"
+                  ".validate": "newData.val()==='terima'||newData.val()==='susulan'||newData.val()==='retur'||newData.val()==='selesai'||newData.val()==='hari'"
                 },
                 "jumlah": {
                   ".validate": "newData.isNumber()&&newData.val()>=0&&newData.val()<=9999&&newData.val()%1===0"
@@ -258,6 +261,9 @@
                 },
                 "teknisi": {
                   ".validate": "newData.isString()&&newData.val().length>=0&&newData.val().length<=80"
+                },
+                "tanggal": {
+                  ".validate": "newData.isString()&&newData.val().matches(/^[0-9]{4}-[0-9]{2}-[0-9]{2}$/)"
                 },
                 "catatan": {
                   ".validate": "newData.isString()&&newData.val().length>=0&&newData.val().length<=600"
