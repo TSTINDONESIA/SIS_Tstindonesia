@@ -3,6 +3,7 @@ import { ref, onValue, set, serverTimestamp } from 'firebase/database';
 import { db, ready } from './firebase.js';
 import { tr } from './i18n.js';
 import { Brand, Modal, Scanner, Spinner } from './ui.jsx';
+import { Icon } from './icons.jsx';
 import { pinjamUnit } from './pinjam.js';
 import { JAMINAN, jaminanAktif, jaminanInfo, unitFromScan, unitNorm, validContact, waLink, jadwalText } from './util.js';
 
@@ -127,36 +128,45 @@ export default function Guest({ eid }) {
   }
 
   const chs = Object.values(cfg.channels || {});
+  // Menu drawer tamu: hanya fungsi yang memang ada di halaman ini.
+  const menuTamu = [
+    { icon: 'book', label: T('guide'), onClick: () => setPanduan(true) },
+    ...(cfg.teknisiWa ? [{ icon: 'help', label: T('helpBtn'), href: waLink(cfg.teknisiWa, ''), external: true }] : []),
+    { icon: 'globe', label: lang === 'id' ? 'English' : 'Bahasa Indonesia', onClick: () => pilihBahasa(lang === 'id' ? 'en' : 'id') },
+  ];
   const header = (
     <>
+      <Brand sub={T('sub')} event={meta ? meta.nama + (meta.tanggal ? ' · ' + jadwalText(meta) : '') : ''} items={menuTamu} />
       <div className="langbar">
-        <span>🌐</span>
+        <Icon name="globe" size={18} />
         <button className={lang === 'id' ? 'on' : ''} onClick={() => pilihBahasa('id')}>ID</button>
         <button className={lang === 'en' ? 'on' : ''} onClick={() => pilihBahasa('en')}>EN</button>
       </div>
-      <Brand sub={T('sub')} event={meta ? meta.nama + (meta.tanggal ? ' · ' + jadwalText(meta) : '') : ''} />
     </>
   );
 
-  if (!eid) return <div className="wrap">{header}<div className="card center"><div className="big">📱</div><p>{T('needEvent')}</p></div></div>;
+  if (!eid) return <div className="wrap">{header}<div className="card center"><div className="big"><Icon name="phone" size={44} /></div><p>{T('needEvent')}</p></div></div>;
   if (meta === undefined || status === undefined || !uid) return <div className="wrap">{header}<Spinner /></div>;
-  if (meta === null) return <div className="wrap">{header}<div className="card center"><div className="big">🔎</div><p>{T('evMissing')}</p></div></div>;
+  if (meta === null) return <div className="wrap">{header}<div className="card center"><div className="big"><Icon name="search" size={44} /></div><p>{T('evMissing')}</p></div></div>;
 
   const bantuan = cfg.teknisiWa ? (
     <div className="card help">
       <b>{T('help')}</b>
-      <a className="btn wa helpbtn" href={waLink(cfg.teknisiWa, '')} target="_blank" rel="noreferrer">💬 {T('helpBtn')}</a>
+      <a className="btn wa helpbtn" href={waLink(cfg.teknisiWa, '')} target="_blank" rel="noreferrer"><Icon name="help" size={22} /> {T('helpBtn')}</a>
     </div>
   ) : null;
 
   return (
     <div className="wrap">
       {header}
+      <figure className="devhero">
+        <img src="./receiver-taiden.jpg" alt="Receiver interpreter TAIDEN dan koper pengisi daya" width="561" height="462" loading="eager" decoding="async" />
+      </figure>
       {status !== 'aktif' ? (
-        <div className="card center"><div className="big">🏁</div><p>{T('evDone')}</p></div>
+        <div className="card center"><div className="big"><Icon name="flag" size={44} /></div><p>{T('evDone')}</p></div>
       ) : null}
 
-      <button className="btn guidebtn" onClick={() => setPanduan(true)}>📖 {T('guide')}</button>
+      <button className="btn guidebtn" onClick={() => setPanduan(true)}><Icon name="book" size={22} /> {T('guide')}</button>
 
       {loans.length > 0 ? (
         <div className="card">
@@ -196,7 +206,7 @@ export default function Guest({ eid }) {
               </div>
             ) : null}
             <div className="rowbtn">
-              <button className="btn primary" type="button" onClick={() => { setScanMsg(''); setScan(true); }}>📷 {T('scan')}</button>
+              <button className="btn primary" type="button" onClick={() => { setScanMsg(''); setScan(true); }}><Icon name="scan" size={24} /> {T('scan')}</button>
             </div>
             <div className="chedit" style={{ marginTop: 8 }}>
               <input value={ketik} placeholder={T('typeNo') + ' (A001)'} maxLength={6} autoCapitalize="characters"

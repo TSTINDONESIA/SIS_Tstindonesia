@@ -1,7 +1,8 @@
 import React, { useCallback, useEffect, useState } from 'react';
 import { ref, get, set, remove } from 'firebase/database';
 import { db, ready } from './firebase.js';
-import { Brand, Spinner } from './ui.jsx';
+import { Brand, NavCtx, Spinner } from './ui.jsx';
+import { Icon } from './icons.jsx';
 import { normHp } from './util.js';
 import { Dashboard, DaftarAcara } from './Usher.jsx';
 import Admin from './Admin.jsx';
@@ -63,19 +64,19 @@ export default function Staff({ hash }) {
   const sesi = useSesi();
   if (sesi.loading) return <div className="wrap"><Spinner /></div>;
   if (sesi.error) return <div className="wrap"><div className="err">Tidak bisa terhubung ke Firebase. Periksa koneksi dan pengaturan Authentication (Anonymous).</div></div>;
-  if (!sesi.hp) return <Login sesi={sesi} />;
+  if (!sesi.hp) return <NavCtx.Provider value={sesi}><Login sesi={sesi} /></NavCtx.Provider>;
   const ma = hash.match(/^#\/admin(?:\/([a-z]+))?/);
   if (ma) {
     if (!sesi.isSuper) {
       return (
-        <div className="wrap"><Brand sub="Super Admin" />
-          <div className="card center"><div className="big">🔒</div><p>Nomor Anda bukan Super Admin.</p>
-            <a className="btn" href="#/usher">Ke halaman Usher</a></div></div>
+        <NavCtx.Provider value={sesi}><div className="wrap"><Brand sub="Super Admin" />
+          <div className="card center"><div className="big"><Icon name="lock" size={44} /></div><p>Nomor Anda bukan Super Admin.</p>
+            <a className="btn" href="#/usher">Ke halaman Usher</a></div></div></NavCtx.Provider>
       );
     }
-    return <Admin sesi={sesi} sub={ma[1] || ''} />;
+    return <NavCtx.Provider value={sesi}><Admin sesi={sesi} sub={ma[1] || ''} /></NavCtx.Provider>;
   }
   const mu = hash.match(/^#\/usher\/([a-z0-9]{4,12})/);
-  if (mu) return <Dashboard key={mu[1]} eid={mu[1]} sesi={sesi} />;
-  return <DaftarAcara sesi={sesi} />;
+  if (mu) return <NavCtx.Provider value={sesi}><Dashboard key={mu[1]} eid={mu[1]} sesi={sesi} /></NavCtx.Provider>;
+  return <NavCtx.Provider value={sesi}><DaftarAcara sesi={sesi} /></NavCtx.Provider>;
 }

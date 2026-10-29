@@ -5,6 +5,7 @@ import { jsPDF } from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { db } from './firebase.js';
 import { Brand, Modal, Scanner, Spinner } from './ui.jsx';
+import { Icon } from './icons.jsx';
 import { pinjamUnit } from './pinjam.js';
 import { pdfQrMeja, bukaCetak } from './labels.js';
 import {
@@ -39,10 +40,10 @@ export function DaftarAcara({ sesi }) {
         <span className="muted">Nomor: {tampilHp(sesi.hp)}{sesi.isSuper ? ' · Super Admin' : ''}</span>
         <button className="link" onClick={sesi.logout}>Keluar</button>
       </div>
-      {sesi.isSuper ? <a className="btn primary" style={{ width: '100%', marginBottom: 12 }} href="#/admin">⚙️ Super Admin</a> : null}
+      {sesi.isSuper ? <a className="btn primary" style={{ width: '100%', marginBottom: 12 }} href="#/admin"><Icon name="sliders" size={20} /> Super Admin</a> : null}
       {err ? <div className="err">{err}</div> : null}
       {list === null ? <Spinner /> : list.length === 0 ? (
-        <div className="card center"><div className="big">📭</div><p>Belum ada acara yang ditugaskan kepada Anda.</p></div>
+        <div className="card center"><div className="big"><Icon name="inbox" size={44} /></div><p>Belum ada acara yang ditugaskan kepada Anda.</p></div>
       ) : list.map((e) => (
         <a key={e.id} href={'#/usher/' + e.id} className={'ev' + (e.status === 'aktif' ? '' : ' done')} style={{ textDecoration: 'none', color: 'inherit' }}>
           <div className="row"><span className="t">{e.meta.nama}</span><span className={'pill ' + (e.status === 'aktif' ? 'on' : 'off')}>{e.status === 'aktif' ? 'Aktif' : 'Selesai'}</span></div>
@@ -171,7 +172,7 @@ function DialogManual({ eid, uid, cfg, awal, onClose }) {
       <div className="chedit">
         <input value={ketik} placeholder="A001" maxLength={6} style={{ textTransform: 'uppercase' }} onChange={(e) => setKetik(e.target.value.toUpperCase())} />
         <button className="btn" onClick={() => { const u = unitNorm(ketik); if (u) { tambah(u); setKetik(''); } }}>Tambah</button>
-        <button className="btn" onClick={() => setScan(!scan)}>📷</button>
+        <button className="btn" aria-label="Scan receiver" onClick={() => setScan(!scan)}><Icon name="scan" size={22} /></button>
       </div>
       {scan ? <Scanner onCode={(t) => { const u = unitFromScan(t); if (u) tambah(u); }} hint="Scan receiver satu per satu" /> : null}
       {err.map((x, i) => <div key={i} className="err">{x}</div>)}
@@ -371,7 +372,7 @@ function DialogHari({ meta, loans, grup, logs, ingatkan, onTutup, onClose }) {
 
   return (
     <Modal wide>
-      <h2>{tutup ? '✓ Hari ini ditutup' : 'Hari ini selesai?'}</h2>
+      <h2>{tutup ? 'Hari ini ditutup' : 'Hari ini selesai?'}</h2>
       <div className="muted">{tglLabel(hari)}{semuaHari.length > 1 && ke > 0 ? ` · hari ke-${ke} dari ${semuaHari.length}` : ''}</div>
       <div className="stats">
         <div><b>{r.dipinjam.length}</b><span>Dipinjam hari ini</span></div>
@@ -648,7 +649,7 @@ export function Dashboard({ eid, sesi }) {
     try { await update(ref(db, 'sis'), upd); } catch {}
   };
 
-  if (ditolak) return <div className="wrap"><Brand sub="Usher" /><div className="card center"><div className="big">🔒</div><p>Anda tidak ditugaskan di acara ini.</p><a className="btn" href="#/usher">Kembali</a></div></div>;
+  if (ditolak) return <div className="wrap"><Brand sub="Usher" /><div className="card center"><div className="big"><Icon name="lock" size={44} /></div><p>Anda tidak ditugaskan di acara ini.</p><a className="btn" href="#/usher">Kembali</a></div></div>;
   if (meta === undefined || status === undefined || aktif === undefined) return <div className="wrap"><Spinner /></div>;
   if (meta === null) return <div className="wrap"><div className="card center"><p>Acara tidak ditemukan.</p><a className="btn" href="#/usher">Kembali</a></div></div>;
 
@@ -657,19 +658,19 @@ export function Dashboard({ eid, sesi }) {
 
   return (
     <div className="wrap wide">
+      <Brand />
       <div className="head">
-        <img src="./logo.png" alt="" />
         <div><h1>{meta.nama}</h1><div className="muted">{jadwalText(meta)} · {nama}</div></div>
         <span className={'pill ' + (selesai ? 'off' : 'on')}>{selesai ? 'Selesai' : 'Aktif'}</span>
       </div>
       <div className="row" style={{ marginBottom: 10 }}>
-        <a className="link" href="#/usher">← Daftar acara</a>
+        <a className="link" href="#/usher"><Icon name="back" size={18} /> Daftar acara</a>
         {sesi.isSuper ? <a className="link" href="#/admin">Super Admin</a> : null}
       </div>
 
       <div className="tabs">
-        {[['pinjam', 'Peminjaman'], ['stok', 'Stok'], ['nilai', 'Penilaian'], ['atur', 'Pengaturan']].map(([k, t]) => (
-          <button key={k} className={tab === k ? 'on' : ''} onClick={() => setTab(k)}>{t}</button>
+        {[['pinjam', 'Peminjaman', 'device'], ['stok', 'Stok', 'package'], ['nilai', 'Penilaian', 'checkCircle'], ['atur', 'Pengaturan', 'sliders']].map(([k, t, ic]) => (
+          <button key={k} className={tab === k ? 'on' : ''} aria-current={tab === k ? 'page' : undefined} onClick={() => setTab(k)}><Icon name={ic} size={20} /><span>{t}</span></button>
         ))}
       </div>
 
@@ -683,10 +684,10 @@ export function Dashboard({ eid, sesi }) {
           {!selesai ? (
             <div className="card">
               <div className="rowbtn">
-                <button className="btn primary" onClick={() => { setInfo(''); setScan(true); }}>📷 Scan receiver</button>
-                <button className="btn" onClick={() => setDlg({ jenis: 'manual' })}>+ Catat manual</button>
+                <button className="btn primary" onClick={() => { setInfo(''); setScan(true); }}><Icon name="scan" size={22} /> Scan receiver</button>
+                <button className="btn" onClick={() => setDlg({ jenis: 'manual' })}><Icon name="user" size={20} /> Catat manual</button>
               </div>
-              <button className="btn" style={{ width: '100%', marginTop: 8 }} onClick={() => setDlg({ jenis: 'hari' })}>📅 Hari ini selesai{buka.length ? ` · ${buka.length} belum kembali` : ''}</button>
+              <button className="btn" style={{ width: '100%', marginTop: 8 }} onClick={() => setDlg({ jenis: 'hari' })}><Icon name="calendar" size={20} /> Hari ini selesai{buka.length ? ` · ${buka.length} belum kembali` : ''}</button>
               <div className="chedit">
                 <input value={ketik} placeholder="Ketik nomor, mis. A001" maxLength={6} style={{ textTransform: 'uppercase' }} onChange={(e) => setKetik(e.target.value.toUpperCase())}
                   onKeyDown={(e) => { if (e.key === 'Enter') { const u = unitNorm(ketik); if (u) { bukaKembaliDariUnit(u); setKetik(''); } else setInfo('Nomor tidak valid.'); } }} />
@@ -734,18 +735,18 @@ export function Dashboard({ eid, sesi }) {
             <div><b style={{ color: adaTerima && tersedia <= 3 ? '#FCA5A5' : undefined }}>{adaTerima ? tersedia : '-'}</b><span>Tersedia</span></div>
           </div>
           {selesai ? (
-            <div className="card center"><div className="big">🏁</div><p>Acara sudah selesai.</p></div>
+            <div className="card center"><div className="big"><Icon name="flag" size={44} /></div><p>Acara sudah selesai.</p></div>
           ) : !adaTerima ? (
             <button className="btn primary big-cta" onClick={() => setDlg({ jenis: 'terima' })}>＋ Terima dari teknisi</button>
           ) : !adaRetur ? (
             <>
-              <button className="btn primary big-cta" onClick={() => setDlg({ jenis: 'retur' })}>↩ Kembalikan ke teknisi</button>
+              <button className="btn primary big-cta" onClick={() => setDlg({ jenis: 'retur' })}><Icon name="undo" size={22} /> Kembalikan ke teknisi</button>
               <button className="link" onClick={() => setDlg({ jenis: 'susulan' })}>Tambah penerimaan susulan</button>
             </>
           ) : (
             <>
               <div className="jamdone">Sudah dikembalikan ke teknisi ✓</div>
-              <button className="btn primary big-cta" style={{ marginTop: 10 }} onClick={() => setKonfSelesai(true)}>🏁 Acara Selesai</button>
+              <button className="btn primary big-cta" style={{ marginTop: 10 }} onClick={() => setKonfSelesai(true)}><Icon name="flag" size={22} /> Acara Selesai</button>
             </>
           )}
           <div className="card" style={{ marginTop: 14 }}>

@@ -3,6 +3,7 @@ import { ref, get, update } from 'firebase/database';
 import QRCode from 'qrcode';
 import { db } from './firebase.js';
 import { Brand, Modal, Spinner } from './ui.jsx';
+import { Icon } from './icons.jsx';
 import { pdfLabel, pdfQrMeja, bukaCetak, qrSvgPath, TATA_LETAK } from './labels.js';
 import { daftarUnit, eventUrl, jadwalText, newEid, normHp, parseKontak, tampilHp, JAMINAN_DEFAULT } from './util.js';
 
@@ -44,7 +45,7 @@ function EditorPetugas({ list, setList }) {
     <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
       <b>Daftar Usher</b>
       <span className="muted fine">Salin kontak dari HP (nama dan nomor, bisa banyak sekaligus), lalu tempel di sini. Nomor ini dipakai Usher untuk masuk.</span>
-      {bisaKontak ? <button className="btn" type="button" onClick={pilihKontak}>📇 Pilih dari kontak HP</button> : null}
+      {bisaKontak ? <button className="btn" type="button" onClick={pilihKontak}><Icon name="user" size={20} /> Pilih dari kontak HP</button> : null}
       <textarea className="paste" value={teks} placeholder={'Budi Santoso 0812-3456-7890\nSiti Aminah\n+62 813 1111 2222'} onChange={(e) => setTeks(e.target.value)} />
       <button className="btn" type="button" disabled={!teks.trim()} onClick={tambahTeks}>Tambahkan ke daftar</button>
       {hasil ? <div className="muted">{hasil}</div> : null}
@@ -279,12 +280,12 @@ function Beranda({ sesi }) {
         <span><a className="link" href="#/usher">Halaman Usher</a> · <button className="link" onClick={sesi.logout}>Keluar</button></span>
       </div>
       <div className="rowbtn" style={{ marginBottom: 12 }}>
-        <button className="btn primary" onClick={() => setDlg({ j: 'baru' })}>＋ Buat acara</button>
-        <a className="btn" href="#/admin/cetak">🏷️ Cetak barcode alat</a>
+        <button className="btn primary" onClick={() => setDlg({ j: 'baru' })}><Icon name="calendar" size={20} /> Buat acara</button>
+        <a className="btn" href="#/admin/cetak"><Icon name="tag" size={20} /> Cetak barcode alat</a>
       </div>
       {err ? <div className="err">{err}</div> : null}
       {acara === null ? <Spinner /> : !acara.length ? (
-        <div className="card center"><div className="big">🗓️</div><p>Belum ada acara. Buat acara pertama.</p></div>
+        <div className="card center"><div className="big"><Icon name="calendar" size={44} /></div><p>Belum ada acara. Buat acara pertama.</p></div>
       ) : acara.map((a) => (
         <div key={a.id} className={'ev' + (a.status === 'aktif' ? '' : ' done')}>
           <div className="row"><span className="t">{a.meta.nama}</span><span className={'pill ' + (a.status === 'aktif' ? 'on' : 'off')}>{a.status === 'aktif' ? 'Aktif' : 'Selesai'}</span></div>
@@ -300,7 +301,7 @@ function Beranda({ sesi }) {
           </div>
           {a.status === 'selesai' ? (
             <div className="rowbtn">
-              <button className="btn primary" onClick={() => setDlg({ j: 'buka', a })}>↩ Buka kembali acara</button>
+              <button className="btn primary" onClick={() => setDlg({ j: 'buka', a })}><Icon name="undo" size={20} /> Buka kembali acara</button>
             </div>
           ) : null}
         </div>
@@ -349,7 +350,7 @@ function Cetak() {
   return (
     <div className="wrap wide">
       <Brand sub="Cetak barcode alat" />
-      <a className="link" href="#/admin">← Super Admin</a>
+      <a className="link" href="#/admin"><Icon name="back" size={18} /> Super Admin</a>
       <div className="card" style={{ marginTop: 10 }}>
         <h2>Rentang label</h2>
         <div className="rowbtn">
@@ -369,7 +370,7 @@ function Cetak() {
           </div>
         ) : null}
         <div className="rowbtn">
-          <button className="btn primary" disabled={!valid} onClick={() => bukaCetak(buat())}>🖨️ Cetak</button>
+          <button className="btn primary" disabled={!valid} onClick={() => bukaCetak(buat())}><Icon name="printer" size={20} /> Cetak</button>
           <button className="btn" disabled={!valid} onClick={() => buat().save(`label-${huruf}${String(d).padStart(3, '0')}-${huruf}${String(s).padStart(3, '0')}.pdf`)}>Simpan PDF</button>
         </div>
       </div>

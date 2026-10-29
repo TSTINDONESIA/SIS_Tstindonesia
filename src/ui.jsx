@@ -1,26 +1,111 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import jsQR from 'jsqr';
+import { Icon } from './icons.jsx';
 
 export function Spinner() { return <div className="spin" />; }
 
 export function Modal({ children, onClose, wide }) {
   return (
     <div className="modal-bg" onClick={onClose ? (e) => e.target === e.currentTarget && onClose() : undefined}>
-      <div className="modal" style={wide ? { maxWidth: 640 } : undefined}>{children}</div>
+      <div className="modal" role="dialog" aria-modal="true" style={wide ? { maxWidth: 640 } : undefined}>{children}</div>
     </div>
   );
 }
 
-export function Brand({ sub, event }) {
+// Sesi petugas dibagikan lewat context supaya menu drawer mengikuti peran (Usher / Super Admin).
+export const NavCtx = React.createContext(null);
+
+function menuPetugas(sesi, hash) {
+  if (!sesi || !sesi.hp) return [];
+  const admin = hash.startsWith('#/admin');
+  const items = [{ icon: 'calendar', label: 'Daftar acara', href: '#/usher', active: !admin }];
+  if (sesi.isSuper) {
+    items.push({ icon: 'sliders', label: 'Super Admin', href: '#/admin', active: admin && !hash.startsWith('#/admin/cetak') });
+    items.push({ icon: 'tag', label: 'Cetak barcode alat', href: '#/admin/cetak', active: hash.startsWith('#/admin/cetak') });
+  }
+  items.push({ icon: 'logout', label: 'Keluar', onClick: sesi.logout, danger: true });
+  return items;
+}
+
+// Header TST Indonesia + menu hamburger. `items` (opsional) dipakai halaman tamu;
+// halaman petugas memakai menu berdasarkan peran dari NavCtx. Tanpa item, tombol menu tidak ditampilkan.
+export function Brand({ sub, event, items }) {
+  const nav = React.useContext(NavCtx);
+  const hash = useHash();
+  const list = items || menuPetugas(nav, hash);
+  const [open, setOpen] = useState(false);
+  const [closing, setClosing] = useState(false);
+  const closeRef = useRef(null);
+  const btnRef = useRef(null);
+
+  const tutup = useCallback(() => {
+    setClosing(true);
+    setTimeout(() => { setOpen(false); setClosing(false); btnRef.current && btnRef.current.focus(); }, matchMedia('(prefers-reduced-motion: reduce)').matches ? 0 : 180);
+  }, []);
+  useEffect(() => { if (open) { setOpen(false); setClosing(false); } }, [hash]);   // tutup saat berpindah halaman
+  useEffect(() => {
+    if (!open) return undefined;
+    const k = (e) => { if (e.key === 'Escape') tutup(); };
+    addEventListener('keydown', k);
+    closeRef.current && closeRef.current.focus();
+    return () => removeEventListener('keydown', k);
+  }, [open, tutup]);
+
   return (
-    <div className="brand">
-      <img src="./logo.png" alt="TST Indonesia" />
-      <div>
-        <div className="brand-name">TST Indonesia</div>
-        {sub ? <div className="brand-sub">{sub}</div> : null}
-        {event ? <div className="brand-event">{event}</div> : null}
+    <header className="apphead">
+      <div className="apphead-bar">
+        <img className="apphead-logo" src="./logo.png" alt="" width="46" height="46" />
+        <div className="apphead-id">
+          <span className="apphead-name">TST INDONESIA</span>
+          <span className="apphead-tag">Professional Conference Solutions</span>
+        </div>
+        {list.length ? (
+          <button ref={btnRef} type="button" className="iconbtn" aria-label="Buka menu" aria-haspopup="dialog" aria-expanded={open} onClick={() => setOpen(true)}>
+            <Icon name="menu" size={28} />
+          </button>
+        ) : null}
       </div>
-    </div>
+      {sub || event ? (
+        <div className="apphead-title">
+          {sub ? <h1>{sub}</h1> : null}
+          {event ? <p>{event}</p> : null}
+        </div>
+      ) : null}
+
+      {open ? (
+        <div className={'drawer-bg' + (closing ? ' out' : '')} onClick={(e) => e.target === e.currentTarget && tutup()}>
+          <nav className="drawer" role="dialog" aria-modal="true" aria-label="Menu navigasi">
+            <div className="drawer-top">
+              <span className="apphead-name">Menu</span>
+              <button ref={closeRef} type="button" className="iconbtn" aria-label="Tutup menu" onClick={tutup}><Icon name="close" size={26} /></button>
+            </div>
+            <ul>
+              {list.map((it) => {
+                const inner = (
+                  <>
+                    <Icon name={it.icon} size={26} />
+                    <span>{it.label}</span>
+                    {it.active ? <span className="dot" aria-label="halaman aktif" /> : <Icon name="next" size={18} className="chev" />}
+                  </>
+                );
+                const cls = 'drawer-item' + (it.active ? ' on' : '') + (it.danger ? ' danger' : '');
+                return (
+                  <li key={it.label}>
+                    {it.href ? (
+                      <a className={cls} href={it.href} target={it.external ? '_blank' : undefined} rel={it.external ? 'noreferrer' : undefined}
+                        aria-current={it.active ? 'page' : undefined} onClick={() => { if (it.href.startsWith('#') && location.hash === it.href) tutup(); else if (it.external) tutup(); }}>{inner}</a>
+                    ) : (
+                      <button type="button" className={cls} onClick={() => { tutup(); it.onClick && it.onClick(); }}>{inner}</button>
+                    )}
+                  </li>
+                );
+              })}
+            </ul>
+            <div className="drawer-foot">TST Indonesia · Event Control</div>
+          </nav>
+        </div>
+      ) : null}
+    </header>
   );
 }
 
@@ -71,7 +156,7 @@ const beep = () => {
   try { navigator.vibrate && navigator.vibrate([200, 60, 200]); } catch { /* */ }
 };
 
-const ZBTN = { width: 44, height: 44, flex: '0 0 44px', borderRadius: 10, border: '1px solid #2F5FB3', background: '#123A7A', color: '#fff', fontSize: 24, lineHeight: 1, cursor: 'pointer' };
+const ZBTN = { width: 44, height: 44, flex: '0 0 44px', borderRadius: 10, border: '1px solid rgba(40,145,255,.45)', background: '#0D2544', color: '#F5F8FF', fontSize: 24, lineHeight: 1, cursor: 'pointer' };
 
 export function Scanner({ onCode, hint, error }) {
   const vref = useRef(null);
