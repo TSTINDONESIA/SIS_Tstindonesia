@@ -34,6 +34,13 @@ di-host di GitHub Pages. Dibuat dari nol; tidak memakai data v1 (semua data baru
 * Tab **Pengaturan, Laporan**: *Harian CSV/PDF* berisi dipinjam, dikembalikan, dan belum kembali per hari.
 * Aturan database berubah (`tanggalSelesai` di meta, jenis log `hari`): **publish ulang `database.rules.json`**.
 
+### Tampilan (redesign premium dark blue)
+
+* Header TST INDONESIA + menu hamburger (drawer) di semua halaman. Menu mengikuti fungsi nyata: petugas (Daftar acara, Super Admin, Cetak barcode alat, Keluar) dan tamu (Panduan, Hubungi teknisi, Bahasa). Halaman login tanpa menu.
+* Desain token ada di `:root` pada `src/app.css`; ikon outline ada di `src/icons.jsx` (tanpa dependensi baru).
+* Transisi halaman wipe-out/wipe-in ada di `src/main.jsx` + `.route` di CSS; otomatis nonaktif dengan *prefers-reduced-motion*.
+* `public/receiver-taiden.jpg` dipotong dari gambar referensi desain. **Ganti dengan foto resmi perangkat** (nama file sama) bila tersedia.
+
 ## Penomoran alat
 
 Nomor unit `A001` sampai `J100` (1 huruf per 100 alat, total 1000). Aturan ini ada di `src/util.js` (`UNIT_RE`) dan
